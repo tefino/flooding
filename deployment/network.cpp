@@ -354,7 +354,7 @@ void Domain::writeClickFiles(bool montoolstub) {
             cerr<<"Right now only work in single interface scenario"<<endl ;
         }
 
-        click_conf<<"fw[2]->[3]proxy"<<endl ;
+        click_conf<<"fw[2]->[3]proxy;"<<endl ;
 
         click_conf<<"proxy[3]->[2]fw;"<<endl ;
         click_conf<<"cacheunit[0]->[3]fw;"<<endl ;
@@ -366,7 +366,7 @@ void Domain::writeClickFiles(bool montoolstub) {
         click_conf<<"cacheunit[3]->[1]fw;"<<endl ;
 
         click_conf<<"classifier[1]->[0]cacheunit;"<<endl ;
-        click_conf<<"fw[3]->[1]cacheunit"<<endl ;
+        click_conf<<"fw[3]->[1]cacheunit;"<<endl ;
         click_conf<<"classifier[2]->[1]cacheunit;"<<endl ;
         click_conf<<"classifier[3]->[2]cacheunit;"<<endl ;
 

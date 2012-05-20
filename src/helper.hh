@@ -18,6 +18,11 @@
  *  This should be the ONLY place where this definition exists!
  */
 #define PURSUIT_ID_LEN 8
+/**
+ *the size in bytes of information bloom filter
+ */
+#define IBFSIZE PURSUIT_ID_LEN
+#define EBFSIZE IBFSIZE
 /** The size in bytes of the label of each Blackadder node (should be statistically unique)
  *  This label is used as an information item in pub/sub requests and therefore it has to be the same size as the PURSUIT_ID_LEN
  */
@@ -56,6 +61,12 @@
 #define RV_RESPONSE 106
 //our proposal this is for subinfo message destined at publisher
 #define PLEASE_PUSH_DATA 107
+//k-anycast information item published
+#define INFO_PUBLISHED 108
+//k-anycast tm match pub sub under scope
+#define SCOPE_MATCH_PUB_SUB 109
+//k-anycast pub send scope probing message
+#define SCOPE_PROBING 110
 /*RV RETURN CODES - these are unused..The LocalRV returns them for each pub/sub request*/
 #define SUCCESS 0
 #define WRONG_IDS 1
@@ -70,5 +81,9 @@
 #define UNKNOWN_REQUEST_TYPE 10
 /**********************************/
 #define RV_ELEMENT 1 //put the correct click port here
+
+/**********************************/
+#define SCOPE_PROBING_MESSAGE 1
+#define SUB_SCOPE_MESSAGE 2
 
 #endif

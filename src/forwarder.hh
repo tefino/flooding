@@ -146,6 +146,10 @@ public:
      * ethernet type for data pushing
      */
     int datapush_type ;
+    /**@brief kanycast
+     * ethernet type for scope probing
+     */
+    int kanycast_type ;
 };
 
 CLICK_ENDDECLS

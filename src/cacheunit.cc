@@ -50,6 +50,24 @@ bool CacheEntry::matchSID(String SID)
     }
     return false ;
 }
+bool CacheEntry::matchSID(Vector<String> _SIDs)
+{
+    Vector<String>::iterator sid_iter ;
+    bool ret = false ;
+    for(sid_iter = SIDs.begin() ; sid_iter != SIDs.end() ; sid_iter++)
+    {
+        for(Vector<String>::iterator _sid_iter = _SIDs.begin() ; _sid_iter != _SIDs.end() ; _sid_iter++)
+        if(!(_sid_iter->compare(*sid_iter)))
+        {
+            ret = true ;
+            break ;
+        }
+    }
+    if(ret)
+        SIDs = _SIDs ;
+    return ret ;
+}
+
 
 CacheUnit::CacheUnit(){}
 CacheUnit::~CacheUnit(){click_chatter("CacheUnit: destroyed!");}
@@ -131,69 +149,6 @@ void CacheUnit::push(int port, Packet *p)
         memcpy(packet->data()+14+FID_LEN+sizeof(numberOfIDs)+index+FID_LEN, &hop_count, sizeof(hop_count)) ;
         packet->set_anno_u32(0, (uint32_t)(index+sizeof(numberOfIDs)+FID_LEN+14)) ;
         output(0).push(packet) ;
-        /*this is for k-anycast
-        for(cache_iter = cache.begin() ; cache_iter != cache.end() ; cache_iter++)//search for scope ID match
-        {
-            if((*cache_iter)->matchSID(IDs))
-            {
-                IIDs = (*cache_iter)->IIDs ;//assign information ID
-                break ;
-            }
-        }
-
-
-        memcpy(BFforIID._data, p->data()+14+FID_LEN+sizeof(numberOfIDs)+index+FID_LEN, PURSUIT_ID_LEN) ;
-        memcpy(&numberOfInfoIDs, p->data()+14+FID_LEN+sizeof(numberOfIDs)+index+FID_LEN+PURSUIT_ID_LEN,\
-                sizeof(numberOfInfoIDs)) ;
-        Vector<String> uniqueIIDs ;
-        uniqueIIDs.clear() ;
-        for(iiditer = IIDs.begin() ; iiditer != IIDs.end() ; iiditer++)//erase the information IDs that are already in the probing message
-        {
-            BABitvector tempbitvector(PURSUIT_ID_LEN*8) ;
-            memcpy(tempbitvector._data, iiditer->c_str(), PURSUIT_ID_LEN) ;
-            BABitvector testbitvector(PURSUIT_ID_LEN*8) ;
-            testbitvector = BFforIID&tempbitvector ;
-            if(testbitvector != tempbitvector)//not in the probing message
-            {
-                BFforIID = BFforIID|tempbitvector ;//update the bloom filter of informatino ID
-                uniqueIIDs.push_back(*iiditer) ;
-            }
-
-        }
-        if(!uniqueIIDs.empty())//if there are some new information IDs
-        {
-            numberOfInfoIDs += uniqueIIDs.size() ;
-            int original_length ;
-            original_length = p->length() ;
-            WritablePacket *packet=p->put(uniqueIIDs.size()*PURSUIT_ID_LEN) ;
-            memcpy(packet->data()+14+sizeof(numberOfIDs)+index+FID_LEN, BFforIID._data, PURSUIT_ID_LEN) ;//update the bloom filter
-            memcpy(packet->data()+14+sizeof(numberOfIDs)+index+FID_LEN+PURSUIT_ID_LEN,\
-                &numberOfInfoIDs, sizeof(numberOfInfoIDs)) ;
-            for(iiditer = uniqueIIDs.begin() ; iiditer != uniqueIIDs.end() ; iiditer++)//add the new information ID
-            {
-                memcpy(packet->data()+original_length+i*PURSUIT_ID_LEN, iiditer->c_str(), PURSUIT_ID_LEN) ;
-                i++ ;
-            }
-            output(0).push(packet) ;
-
-            int packetsize = p->length()+uniqueIIDs.size()*PURSUIT_ID_LEN ;
-            WritablePacket *packet = Packet::make(NULL, packetsize) ;
-            numberOfInfoIDs += uniqueIIDs.size() ;
-            memcpy(packet->data(), p->data, 14+sizeof(numberOfIDs)+index+FID_LEN) ;
-            memcpy(packet->data()+14+sizeof(numberOfIDs)+index+FID_LEN, BFforIID._data, PURSUIT_ID_LEN) ;
-            memcpy(packet->data()+14+sizeof(numberOfIDs)+index+FID_LEN+PURSUIT_ID_LEN,\
-                &numberOfInfoIDs, sizeof(numberOfInfoIDs)) ;
-            memcpy(packet->data()+14+sizeof(numberOfIDs)+index+FID_LEN+PURSUIT_ID_LEN+sizeof(numberOfInfoIDs),\
-                   p->data()+14+sizeof(numberOfIDs)+index+FID_LEN+PURSUIT_ID_LEN+sizeof(numberOfInfoIDs),\
-                   (numberOfInfoIDs-uniqueIIDs.size())*PURSUIT_ID_LEN) ;
-            for(iiditer = uniqueIIDs.begin() ; iiditer != uniqueIIDs.end() ; iiditer++)
-            {
-                memcpy(packet->data()+p->length()+i*PURSUIT_ID_LEN, iiditer->c_str(), PURSUIT_ID_LEN) ;
-                i++ ;
-            }
-            packet->set_anno_u32(0, (uint32_t)(index+sizeof(numberOfIDs)+FID_LEN+14)) ;
-            p->kill() ;
-            output(0).push(packet) ;*/
     }
     else if(port == 1)
     {
@@ -325,6 +280,164 @@ void CacheUnit::push(int port, Packet *p)
             storecache(IDs, data, datalen) ;
             output(3).push(p) ;
         }
+    }
+    else if(port == 3)
+    {
+        unsigned char type ;
+        if (gc->use_mac) {
+            memcpy(FID._data, p->data() + 14, FID_LEN);
+        } else {
+            return ;//right now only support ethernet level
+        }
+        memcpy(&type, p->data()+14+FID_LEN, sizeof(type)) ;
+        memcpy(&numberOfIDs, p->data()+14+FID_LEN+sizeof(type), sizeof(numberOfIDs)) ;//# of IDs
+        for (int i = 0; i < (int) numberOfIDs; i++) {
+            IDLength = *(p->data()+14+FID_LEN+sizeof(type)+sizeof(numberOfIDs)+index);
+            IDs.push_back(String((const char *) (p->data()+14+FID_LEN+sizeof(type)+sizeof(numberOfIDs)+sizeof(IDLength)+index),\
+                                IDLength * PURSUIT_ID_LEN));
+            index = index + sizeof (IDLength) + IDLength * PURSUIT_ID_LEN;
+        }
+        switch (type)
+        {
+            case SCOPE_PROBING_MESSAGE:
+            {
+                BloomFilter BFforIID(IBFSIZE*8) ;
+                unsigned int hop_passed ;
+                unsigned int total_distance ;
+                unsigned int noofcache ;
+                unsigned int hop_count ;
+
+                memcpy(BFforIID.data._data, p->data()+14+FID_LEN+sizeof(type)+sizeof(numberOfIDs)+index, IBFSIZE) ;
+                memcpy(&hop_passed, p->data()+14+FID_LEN+sizeof(type)+sizeof(numberOfIDs)+index+\
+                       IBFSIZE+FID_LEN, sizeof(hop_passed)) ;
+                memcpy(&total_distance, p->data()+14+FID_LEN+sizeof(type)+sizeof(numberOfIDs)+index+\
+                       IBFSIZE+FID_LEN+sizeof(hop_passed), sizeof(total_distance)) ;
+                memcpy(&noofcache, p->data()+14+FID_LEN+sizeof(type)+sizeof(numberOfIDs)+index+\
+                       IBFSIZE+FID_LEN+sizeof(hop_passed)+sizeof(total_distance), sizeof(noofcache)) ;
+                memcpy(&hop_count, p->data()+14+FID_LEN+sizeof(type)+sizeof(numberOfIDs)+index+\
+                       IBFSIZE+FID_LEN+sizeof(hop_passed)+sizeof(total_distance)+sizeof(noofcache),\
+                       sizeof(hop_count)) ;
+                hop_passed++ ;
+
+                WritablePacket* packet = p->uniqueify() ;
+                for(cache_iter = cache.begin() ; cache_iter != cache.end() ; cache_iter++)
+                {
+                    if((*cache_iter)->matchSID(IDs))
+                    {
+                        Vector<String>::iterator iter ;
+                        for(iter = (*cache_iter)->IIDs.begin() ; iter != (*cache_iter)->IIDs.end() ; iter++)
+                        {
+                            BFforIID.add2bf(*iter) ;
+                        }
+                        total_distance += ((*cache_iter)->IIDs.size())*(hop_count-hop_passed) ;
+                        noofcache += (*cache_iter)->IIDs.size() ;
+                        memcpy(packet->data()+14+FID_LEN+sizeof(type)+sizeof(numberOfIDs)+index,\
+                               BFforIID.data._data, IBFSIZE) ;
+                        memcpy(packet->data()+14+FID_LEN+sizeof(type)+sizeof(numberOfIDs)+index+\
+                                IBFSIZE+FID_LEN, &hop_passed,sizeof(hop_passed)) ;
+                        memcpy(packet->data()+14+FID_LEN+sizeof(type)+sizeof(numberOfIDs)+index+\
+                                IBFSIZE+FID_LEN+sizeof(hop_passed), &total_distance,sizeof(total_distance)) ;
+                        memcpy(packet->data()+14+FID_LEN+sizeof(type)+sizeof(numberOfIDs)+index+\
+                                IBFSIZE+FID_LEN+sizeof(hop_passed)+sizeof(total_distance),&noofcache,  sizeof(noofcache)) ;
+                        packet->set_anno_u32(0, (uint32_t)(IBFSIZE+index+sizeof(numberOfIDs)+sizeof(type)+FID_LEN+14)) ;
+                        output(4).push(packet) ;
+                        return ;
+                    }
+                }
+                memcpy(packet->data()+14+FID_LEN+sizeof(numberOfIDs)+index+FID_LEN, &hop_count, sizeof(hop_count)) ;
+                packet->set_anno_u32(0, (uint32_t)(IBFSIZE+index+sizeof(numberOfIDs)+sizeof(type)+FID_LEN+14)) ;
+                output(4).push(packet) ;
+                break ;
+            }
+            case SUB_SCOPE_MESSAGE:
+            {
+                for(cache_iter = cache.begin() ; cache_iter != cache.end() ; cache_iter++)
+                {
+                    if((*cache_iter)->matchSID(IDs))
+                    {
+                        BloomFilter ebf(EBFSIZE*8) ;
+                        BloomFilter ibf(IBFSIZE*8) ;
+                        BABitvector to_sub_FID(FID_LEN*8) ;
+                        memcpy(ebf.data._data, p->data()+14+FID_LEN+sizeof(type)+index, EBFSIZE) ;
+                        memcpy(ibf.data._data, p->data()+14+FID_LEN+sizeof(type)+index+IBFSIZE, IBFSIZE) ;
+                        memcpy(to_sub_FID._data, p->data()+14+FID_LEN+sizeof(type)+index+IBFSIZE+EBFSIZE, FID_LEN) ;
+
+                        Vector<String> infoIDs ;
+                        for(Vector<String>::iterator iter = (*cache_iter)->IIDs.begin() ; iter != (*cache_iter)->IIDs.end() ; iter++)
+                        {
+                            if(!ebf.test(*iter) && ibf.test(*iter))
+                            {
+                                ebf.add2bf(*iter) ;
+                                infoIDs.push_back(*iter) ;
+                            }
+                        }
+                        if(infoIDs.empty())
+                        {
+                            output(5).push(p) ;
+                            return ;
+                        }
+
+                        else
+                        {
+                            sendbackData(IDs, infoIDs, to_sub_FID, (*cache_iter)) ;
+                            if(ebf != ibf)
+                            {
+                                WritablePacket* packet = p->uniqueify() ;
+                                memcpy(packet->data()+14+FID_LEN+sizeof(type)+index, ebf.data._data, EBFSIZE) ;
+                                output(5).push(packet) ;
+                            }
+                            return ;
+                        }
+                    }
+                }
+                output(5).push(p) ;
+            }
+            default:
+                break ;
+        }
+    }
+}
+void CacheUnit::sendbackData(Vector<String>& SIDs, Vector<String>& IIDs, BABitvector FID, CacheEntry* ce)
+{
+    int reverse_proto ;
+    int prototype ;
+    cp_integer(String("0x080d"), 16, &reverse_proto);
+    prototype = htons(reverse_proto);
+    Vector<String> IDs ;
+    for(Vector<String>::iterator iid_iter = IIDs.begin() ; iid_iter != IIDs.end() ; iid_iter++)
+    {
+        IDs.clear() ;
+        for(Vector<String>::iterator sid_iter = SIDs.begin() ; sid_iter != SIDs.end() ; sid_iter++)
+        {
+            String tempstr = (*sid_iter)+(*iid_iter) ;
+            IDs.push_back(tempstr) ;
+        }
+        WritablePacket* packet ;
+        int total_ID_length = 0 ;
+        unsigned char NOofID = IDs.size() ;
+        int IDindex = 0 ;
+        unsigned char IDLength /*in fragments*/ ;
+        for(Vector<String>::iterator id_iter = IDs.begin() ; id_iter != IDs.end() ; id_iter++)
+        {
+            total_ID_length += id_iter->length() ;
+        }
+        unsigned int packet_len = 14+FID_LEN/*reverse FID*/+sizeof(NOofID)/*numberofID*/+NOofID*sizeof(IDLength)/*number of fragment*/+\
+                     total_ID_length/*IDs*/+ce->_data_length[*iid_iter] ;
+        packet = Packet::make(packet_len) ;
+        memcpy(packet->data()+12, &prototype, 2) ;
+        memcpy(packet->data()+14, FID._data, FID_LEN) ;
+        memcpy(packet->data()+14+FID_LEN, &NOofID, sizeof(NOofID)) ;//#ofID
+
+        for(Vector<String>::iterator id_iter = IDs.begin() ; id_iter != IDs.end() ;id_iter++)//ID length ID
+        {
+            IDLength = id_iter->length()/PURSUIT_ID_LEN ;
+            memcpy(packet->data()+14+FID_LEN+sizeof(NOofID)+IDindex, &IDLength, sizeof(IDLength)) ;
+            memcpy(packet->data()+14+FID_LEN+sizeof(NOofID)+IDindex+sizeof(IDLength), id_iter->c_str(),id_iter->length()) ;
+            IDindex += sizeof(IDLength)+id_iter->length() ;
+        }
+        memcpy(packet->data()+14+FID_LEN+sizeof(NOofID)+IDindex, ce->_data[*iid_iter],\
+               ce->_data_length[*iid_iter]) ;
+        output(1).push(packet) ;
     }
 }
 

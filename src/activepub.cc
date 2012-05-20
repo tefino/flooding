@@ -29,6 +29,11 @@ ActiveSubscription::ActiveSubscription(String _fullID, unsigned char _strategy, 
     strategy = _strategy;
     isScope = _isScope;
     hop_count = 255 ;
+
+    //kanycast
+    probing_received = false ;
+    noofiipub = 0 ;
+    noofrcvpub = 0 ;
 }
 
 ActiveSubscription::~ActiveSubscription() {

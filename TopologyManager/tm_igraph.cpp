@@ -148,6 +148,38 @@ Bitvector *TMIgraph::calculateFID(string &source, string &destination) {
     return result;
 }
 
+void TMIgraph::calculateFID(set<string> &publishers, set<string> &subscribers,\
+                      map<string, map<string,pair<Bitvector*, unsigned int> > > &kanycast_result)
+{
+    set<string>::iterator subscribers_it;
+    set<string>::iterator publishers_it;
+    Bitvector resultFID(FID_LEN*8) ;
+    unsigned int numberOfHops = 0;
+
+    //first add all publishers to the hashtable with NULL FID
+    for(publishers_it = publishers.begin() ; publishers_it != publishers.end() ; publishers_it++)
+    {
+        for(subscribers_it = subscribers.begin() ; subscribers_it != subscribers.end() ; subscribers_it++)
+        {
+            kanycast_result[*publishers_it][*subscribers_it] = pair<Bitvector*,int>(NULL, 0) ;
+        }
+    }
+    for(subscribers_it = subscribers.begin() ; subscribers_it != subscribers.end() ; subscribers_it++)
+    {
+        /*for all subscribers calculate the number of hops from all publishers (not very optimized...don't you think?)*/
+        for(publishers_it = publishers.begin() ; publishers_it != publishers.end() ; publishers_it++)
+        {
+            resultFID.clear();
+            string str1 = (*publishers_it);
+            string str2 = (*subscribers_it);
+            calculateFID(str1, str2, resultFID, numberOfHops);
+
+            kanycast_result[*publishers_it][*subscribers_it].first = new Bitvector(resultFID) ;
+            kanycast_result[*publishers_it][*subscribers_it].second = numberOfHops ;
+        }
+    }
+}
+
 /*main function for rendezvous*/
 void TMIgraph::calculateFID(set<string> &publishers, set<string> &subscribers,\
                             map<string, Bitvector *> &result,\

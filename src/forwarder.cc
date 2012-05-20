@@ -56,6 +56,7 @@ int Forwarder::configure(Vector<String> &conf, ErrorHandler *errh) {
     int reverse_probing ;
     int reverse_subinfo ;
     int reverse_datapush ;
+    int reverse_kanycast ;
     gc = (GlobalConf *) cp_element(conf[0], this);
     _id = 0;
     click_chatter("*****************************************************FORWARDER CONFIGURATION*****************************************************");
@@ -64,6 +65,7 @@ int Forwarder::configure(Vector<String> &conf, ErrorHandler *errh) {
     cp_integer(String("0x080b"), 16, &reverse_subinfo) ;//our propsal ethernet type for subscribe information item
     cp_integer(String("0x080c"), 16, &reverse_probing) ;//our proposal ethernet type for probing
     cp_integer(String("0x080d"), 16, &reverse_datapush) ;//our proposal ethernet type for data pushing
+    cp_integer(String("0x0901"), 16, &reverse_kanycast) ;
     proto_type = htons(reverse_proto);
     subinfo_type = htons(reverse_subinfo) ;
     probing_type = htons(reverse_probing) ;
@@ -154,7 +156,7 @@ void Forwarder::push(int in_port, Packet *p) {
     bool pushLocally = false;
     click_ip *ip;
     click_udp *udp;
-    if (in_port == 0 || in_port == 2 || in_port == 4 ||in_port == 5) {
+    if (in_port == 0 || in_port == 2 || in_port == 4 || in_port == 5 || in_port == 6) {
         /*0 for local packet, 2 for probing message , 4 for subinfo message, 5 for data push*/
         memcpy(FID._data, p->data(), FID_LEN);
         //Check all entries in my forwarding table and forward appropriately
@@ -202,18 +204,24 @@ void Forwarder::push(int in_port, Packet *p) {
                     click_chatter("fw: sending out a subinfo request") ;
                     BABitvector testfid(FID_LEN*8) ;
                     testfid = FID & gc->iLID ;
-                    
+
                     memcpy(newPacket->data() + MAC_LEN + MAC_LEN, &subinfo_type, 2) ;
                     if( testfid == gc->iLID )
                     {
                         output(3).push(newPacket) ;
-                        return ;
+                        counter++ ;
+                        continue ;
                     }
                 }
                 else if(in_port == 5)
                 {
                     click_chatter("fw: sending out data") ;
                     memcpy(newPacket->data() + MAC_LEN + MAC_LEN, &datapush_type, 2) ;
+                }
+                else if(in_port == 6)
+                {
+                    click_chatter("fw: sending out a kanycast message") ;
+                    memcpy(newPacket->data() + MAC_LEN + MAC_LEN, &kanycast_type, 2) ;
                 }
                 /*push the packet to the appropriate ToDevice Element*/
                 output(fe->port).push(newPacket);
@@ -247,7 +255,7 @@ void Forwarder::push(int in_port, Packet *p) {
             }
             counter++;
         }
-    } else if (in_port == 1 || in_port == 3) {
+    } else if (in_port == 1 || in_port == 3 || in_port == 7 || in_port == 8) {
         /**a packet has been pushed by the underlying network.**/
         /*check if it needs to be forwarded*/
         if (gc->use_mac) {
@@ -260,7 +268,7 @@ void Forwarder::push(int in_port, Packet *p) {
         EtherAddress reverse_dst ;//our proposal reverse link source
         EtherAddress reverse_src ;//our proposal reverse link destination
         uint32_t offset = 0 ;//our proposal the offset to reverse FID in the probing message
-        if(in_port == 3)
+        if(in_port == 3 || in_port == 7)
         {//get the reverse src and dst
             offset = *(p->anno_u32()) ;
             memcpy(reverse_src.data(), p->data(), MAC_LEN) ;
@@ -277,7 +285,7 @@ void Forwarder::push(int in_port, Packet *p) {
                     //click_chatter(" notify %d\n",fe->port);
                     out_links.push_back(fe);
                 }
-                if(in_port == 3)//our proposal find the reverse link
+                if(in_port == 3 || in_port == 7)//our proposal find the reverse link
                 {
                     if(((*fe->src) == reverse_src) && ((*fe->dst) == reverse_dst))
                     {
@@ -306,7 +314,7 @@ void Forwarder::push(int in_port, Packet *p) {
                 if (gc->use_mac) {
                     /*prepare the mac header*/
                     /*destination MAC*/
-                    if(in_port == 3)//our proposal modify the reverse FID
+                    if(in_port == 3 || in_port == 7)//our proposal modify the reverse FID
                     {
                         memcpy(payload->data()+offset, reverse_FID._data, FID_LEN) ;
                     }
@@ -346,6 +354,18 @@ void Forwarder::push(int in_port, Packet *p) {
                     payload = p->uniqueify();
                     memcpy(payload->data()+offset-14, reverse_FID._data, FID_LEN) ;
                     output(2).push(payload);//push to localproxy via port 2, don't pull the FID
+                }
+                if(in_port == 7)
+                {
+                    p->pull(14);
+                    payload = p->uniqueify();
+                    memcpy(payload->data()+offset-14, reverse_FID._data, FID_LEN) ;
+                    output(3).push(payload);//push to localproxy via port 2, don't pull the FID
+                }
+                if(in_port == 8)
+                {
+                    p->pull(14);
+                    output(3).push(p) ;
                 }
                 else
                 {

@@ -42,10 +42,32 @@ int main(int argc, char* argv[]) {
     }
     cout << "Process ID: " << getpid() << endl;
     string id = "0000000000000001";
-    string prefix_id = "0000000000000001";
+    string prefix_id ;
     string bin_id = hex_to_chararray(id);
     string bin_prefix_id = hex_to_chararray(prefix_id);
     ba->publish_scope(bin_id, bin_prefix_id, DOMAIN_LOCAL, NULL, 0);
+
+    prefix_id = "0000000000000001";
+    bin_prefix_id = hex_to_chararray(prefix_id) ;
+    id = "0000000000000001";
+    bin_id = hex_to_chararray(id);
+    ba->publish_info(bin_id, bin_prefix_id, DOMAIN_LOCAL, NULL, 0) ;
+
+    id = "0000000000000002";
+    bin_id = hex_to_chararray(id);
+    ba->publish_info(bin_id, bin_prefix_id, DOMAIN_LOCAL, NULL, 0) ;
+
+    id = "0000000000000004";
+    bin_id = hex_to_chararray(id);
+    ba->publish_info(bin_id, bin_prefix_id, DOMAIN_LOCAL, NULL, 0) ;
+
+    id = "0000000000000008";
+    bin_id = hex_to_chararray(id);
+    ba->publish_info(bin_id, bin_prefix_id, DOMAIN_LOCAL, NULL, 0) ;
+
+    id = "0000000000000010";
+    bin_id = hex_to_chararray(id);
+    ba->publish_info(bin_id, bin_prefix_id, DOMAIN_LOCAL, NULL, 0) ;
 
     while (true) {
         Event ev;
@@ -59,8 +81,9 @@ int main(int argc, char* argv[]) {
                 break;
             case PLEASE_PUSH_DATA:
                 cout << "PLEASE_PUSH_DATA: " << chararray_to_hex(ev.id) << endl;
+                sprintf(payload, "this is published from node ? ID is %s", ev.id.c_str()) ;
                 for (int i = 0; i < 1; i++) {
-                    ba->publish_data(ev.id, IMPLICIT_RENDEZVOUS, (char*)ev.to_sub_FID.to_string().c_str(), FID_LEN, payload, payload_size);
+                    ba->publish_data(ev.id, IMPLICIT_RENDEZVOUS, (char*)ev.to_sub_FID._data, FID_LEN, payload, payload_size);
                 }
                 break;
             case STOP_PUBLISH:

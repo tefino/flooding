@@ -30,7 +30,7 @@ class ActivePublication;
 class ActiveSubscription;
 
 /** @brief (blackadder Core) A click-compatible way of implementing a set of LocalHost (see localhost.hh)
- * 
+ *
  * LocalHostSetItem represents a LocalHost that can be inserted in a set (Click HashTable)
  */
 struct LocalHostSetItem {
@@ -58,7 +58,7 @@ struct LocalHostSetItem {
 };
 
 /** @brief (blackadder Core) A click-compatible way of implementing a set of RemoteHost (see remotehost.hh)
- * 
+ *
  * RemoteHostSetItem represents a RemoteHost that can be inserted in a set (Click HashTable)
  */
 struct RemoteHostSetItem {
@@ -83,7 +83,7 @@ struct RemoteHostSetItem {
 };
 
 /** @brief (blackadder Core) A click-compatible way of implementing a set of String (Click's string)
- * 
+ *
  * StringSetItem represents a String that can be inserted in a set (Click HashTable)
  */
 struct StringSetItem {
@@ -109,7 +109,7 @@ struct StringSetItem {
 };
 
 /** @brief (blackadder Core) A click-compatible way of implementing a set of InformationItem (see informationitem.hh)
- * 
+ *
  * InformationItemSetItem represents an InformationItem that can be inserted in a set (Click HashTable)
  */
 struct InformationItemSetItem {
@@ -134,7 +134,7 @@ struct InformationItemSetItem {
 };
 
 /** @brief (blackadder Core) A click-compatible way of implementing a set of Scope (see scope.hh)
- * 
+ *
  * ScopeSetItem represents a Scope that can be inserted in a set (Click HashTable)
  */
 struct ScopeSetItem {

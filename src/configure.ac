@@ -15,7 +15,7 @@ dnl legally binding.
 AC_INIT(click-blackadder, 2.0.1)
 AC_SUBST(ac_configure_args)
 
-CLICKPACKAGENAME=blackadder_with_probing
+CLICKPACKAGENAME=blackadder_kanycast
 AC_SUBST(CLICKPACKAGENAME)
 
 

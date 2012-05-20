@@ -226,9 +226,9 @@ void Domain::writeClickFiles(bool montoolstub) {
         NetworkNode *nn = network_nodes[i];
         click_conf.open((write_conf + nn->label + ".conf").c_str());
         if (montoolstub && (nn->running_mode.compare("user") == 0)) {
-            click_conf << "require(blackadder_with_probing); \n\nControlSocket(\"TCP\",55555);\n\n " << endl << endl;
+            click_conf << "require(blackadder_kanycast); \n\nControlSocket(\"TCP\",55555);\n\n " << endl << endl;
         } else {
-            click_conf << "require(blackadder_with_probing);" << endl << endl;
+            click_conf << "require(blackadder_kanycast);" << endl << endl;
         }
         /*Blackadder Elements First*/
         click_conf << "globalconf::GlobalConf(MODE " << overlay_mode << ", NODEID " << nn->label << "," << endl;
@@ -297,8 +297,8 @@ void Domain::writeClickFiles(bool montoolstub) {
             }
             /*Necessary Click Elements*/
             if (nn->running_mode.compare("user") == 0) {
-                //Our proposal 080c for probing, 080b for subinfo request, 080d for data transfer
-                click_conf << "classifier::Classifier(12/080a, 12/080c, 12/080b, 12/080d);" << endl;
+                //Our proposal 080c for probing, 080b for subinfo request, 080d for data transfer, 0901 for kanycast
+                click_conf << "classifier::Classifier(12/080a, 12/080c, 12/080b, 12/080d, 12/0901);" << endl;
             } else {
                 click_conf << "classifier::Classifier(12/080a, -);" << endl;
                 click_conf << "tohost::ToHost();" << endl;
@@ -369,6 +369,12 @@ void Domain::writeClickFiles(bool montoolstub) {
         click_conf<<"fw[3]->[1]cacheunit"<<endl ;
         click_conf<<"classifier[2]->[1]cacheunit;"<<endl ;
         click_conf<<"classifier[3]->[2]cacheunit;"<<endl ;
+
+        click_conf<<"fw[3]->[4]proxy"<<endl ;
+        click_conf<<"proxy[6]->[6]fw"<<endl ;
+        click_conf<<"cacheunit[4]->[7]fw"<<endl ;
+        click_conf<<"cacheunit[5]->[8]fw"<<endl ;
+        click_conf<<"classifier[4]->[3]cacheunit"<<endl ;
         click_conf.close();
     }
 }
@@ -468,7 +474,7 @@ void Domain::startTM() {
     }
     pclose(ssh_command);
     /*now start the TM*/
-    command = "ssh " + user + "@" + TM_node->testbed_ip + " \"/home/" + "/blackadder-1.1/TopologyManager/tm " + write_conf + "topology.graphml > /tmp/tm.log 2>&1 &\"";
+    command = "ssh " + user + "@" + TM_node->testbed_ip + " \"/home/" + "/blackadder-2.1/TopologyManager/tm " + write_conf + "topology.graphml > /tmp/tm.log 2>&1 &\"";
     cout << command << endl;
     ssh_command = popen(command.c_str(), "r");
     if (ssh_command == NULL) {

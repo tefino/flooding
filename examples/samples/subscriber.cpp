@@ -42,10 +42,10 @@ int main(int argc, char* argv[]) {
     cout << "Process ID: " << getpid() << endl;
     //string id = "0000000000000000";
     string id = "0000000000000001" ;
-    string prefix_id = "0000000000000001";
+    string prefix_id ;
     string bin_id = hex_to_chararray(id);
     string bin_prefix_id = hex_to_chararray(prefix_id);
-    ba->subscribe_info(bin_id, bin_prefix_id, DOMAIN_LOCAL, NULL, 0);
+    ba->subscribe_scope(bin_id, bin_prefix_id, DOMAIN_LOCAL, NULL, 0);
 
     while (true) {
         Event ev;

@@ -8,7 +8,7 @@
 
 CLICK_DECLS
 
-/** @brief (blackadder Core) Stolen by Click's bitvector. 
+/** @brief (blackadder Core) Stolen by Click's bitvector.
  * Can now directly access the _data value and print it
  */
 class BABitvector {
@@ -46,6 +46,7 @@ public:
     }
 
     /** @brief Return the number of bits in the BABitvector. */
+
     int size() const {
         return _max + 1;
     }
@@ -243,7 +244,7 @@ public:
 };
 
 /**@brief (blackadder Core) Stolen by Click's bitvector. A wrapper class that acts like a single bit.
- * 
+ *
  * Bits are returned by modifiable Bitvectors' operator[].  They act like bools,
  * but Bit operations actually index into individual bits in some shared word. */
 class BABitvector::Bit {
@@ -408,6 +409,7 @@ BABitvector::operator-(const BABitvector &o) const {
 inline void click_swap(BABitvector &a, BABitvector &b) {
     a.swap(b);
 }
+
 
 CLICK_ENDDECLS
 #endif

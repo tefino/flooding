@@ -214,6 +214,7 @@ String BABitvector::to_string() {
     return String(res);
 }
 
+
 CLICK_ENDDECLS
 
 ELEMENT_PROVIDES(BABitvector)

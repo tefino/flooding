@@ -753,16 +753,56 @@ unsigned int LocalRV::subscribe_root_scope(RemoteHost *_subscriber, String &ID, 
                 sc->getInformationItems(_informationitems);
                 /*then, for each one do the rendezvous process*/
                 InformationItemSetIter pub_it;
+                StringSet IIDs ;
+                RemoteHostSet publishers ;
                 for (pub_it = _informationitems.begin(); pub_it != _informationitems.end(); pub_it++) {
-                    RemoteHostSet subscribers;
-                    (*pub_it)._iipointer->getSubscribers(subscribers);
-                    /*careful here...I have multiple fathers*/
-                    for (ScopeSetIter fathersc_it = (*pub_it)._iipointer->fatherScopes.begin(); fathersc_it != (*pub_it)._iipointer->fatherScopes.end(); fathersc_it++) {
-                        (*fathersc_it)._scpointer->getSubscribers(subscribers);
+                    RemoteHostSet temppub;
+                    //k-anycast: get all the IIDs don't care the prefix
+                    IIDs.find_insert((*pub_it)._iipointer->ids.begin()->first.substring((*pub_it)._iipointer->ids.begin()->first.length()-\
+                                                                       PURSUIT_ID_LEN, PURSUIT_ID_LEN)) ;
+                    (*pub_it)._iipointer->getPublishers(temppub) ;
+                    for(RemoteHostSetIter pubiter = temppub.begin() ; pubiter != temppub.end() ; pubiter++)
+                    {
+                        publishers.find_insert(*pubiter) ;
                     }
-                    rendezvous((*pub_it)._iipointer, subscribers);
                 }
+                StringSet SIDs ;
+                //Since it's root scope, there aren't any father scopes
+                SIDs.find_insert(ID) ;
+                //only notufy the newly added subscriber
+                kanycast_notifySubscribers(INFO_PUBLISHED, IIDs, strategy, subscribers, SIDs, publishers.size()) ;
+                kanycast_rendezvous(publishers, subscribers, SIDs, strategy) ;
                 ret = SUCCESS;
+
+
+//                /*add the scope to the subscriber's set*/
+//                _subscriber->subscribedScopes.find_insert(StringSetItem(ID));
+//                click_chatter("LocalRV: added subscriber %s to scope %s(%d)", _subscriber->remoteHostID.c_str(), sc->printID().c_str(), (int) strategy);
+//                /*first notify the subscriber about the existing subscopes*/
+//                RemoteHostSet subscribers;
+//                ScopeSet _subscopes;
+//                subscribers.find_insert(_subscriber);
+//                sc->getSubscopes(_subscopes);
+//                for (ScopeSetIter sc_set_it = _subscopes.begin(); sc_set_it != _subscopes.end(); sc_set_it++) {
+//                    StringSet _ids;
+//                    (*sc_set_it)._scpointer->getIDs(_ids);
+//                    notifySubscribers(SCOPE_PUBLISHED, _ids, (*sc_set_it)._scpointer->strategy, subscribers);
+//                }
+//                /*then find all InformationItems for which the _subscriber is interested in*/
+//                InformationItemSet _informationitems;
+//                sc->getInformationItems(_informationitems);
+//                /*then, for each one do the rendezvous process*/
+//                InformationItemSetIter pub_it;
+//                for (pub_it = _informationitems.begin(); pub_it != _informationitems.end(); pub_it++) {
+//                    RemoteHostSet subscribers;
+//                    (*pub_it)._iipointer->getSubscribers(subscribers);
+//                    /*careful here...I have multiple fathers*/
+//                    for (ScopeSetIter fathersc_it = (*pub_it)._iipointer->fatherScopes.begin(); fathersc_it != (*pub_it)._iipointer->fatherScopes.end(); fathersc_it++) {
+//                        (*fathersc_it)._scpointer->getSubscribers(subscribers);
+//                    }
+//                    rendezvous((*pub_it)._iipointer, subscribers);
+//                }
+//                ret = SUCCESS;
             } else {
                 ret = EXISTS;
             }
@@ -821,7 +861,8 @@ unsigned int LocalRV::subscribe_inner_scope(RemoteHost *_subscriber, String &ID,
                         /*first notify the subscriber about the existing subscopes*/
                         RemoteHostSet subscribers;
                         ScopeSet _subscopes;
-                        subscribers.find_insert(RemoteHostSetItem(_subscriber));
+                        //only notify the newly added subscriber
+                        subscribers.find_insert(_subscriber);
                         sc->getSubscopes(_subscopes);
                         for (ScopeSetIter sc_set_it = _subscopes.begin(); sc_set_it != _subscopes.end(); sc_set_it++) {
                             StringSet _ids;
@@ -831,19 +872,58 @@ unsigned int LocalRV::subscribe_inner_scope(RemoteHost *_subscriber, String &ID,
                         /*then find all InformationItems for which the _subscriber is interested in*/
                         InformationItemSet _informationitems;
                         sc->getInformationItems(_informationitems);
-                        /*then, for each one do the rendez-vous process*/
+                        /*then, for each one do the rendezvous process*/
                         InformationItemSetIter pub_it;
+                        StringSet IIDs ;
+                        RemoteHostSet publishers ;
                         for (pub_it = _informationitems.begin(); pub_it != _informationitems.end(); pub_it++) {
-                            RemoteHostSet subscribers;
-                            (*pub_it)._iipointer->getSubscribers(subscribers);
-                            /*careful here...I have multiple fathers*/
-                            ScopeSetIter fathersc_it;
-                            for (fathersc_it = (*pub_it)._iipointer->fatherScopes.begin(); fathersc_it != (*pub_it)._iipointer->fatherScopes.end(); fathersc_it++) {
-                                (*fathersc_it)._scpointer->getSubscribers(subscribers);
+                            RemoteHostSet temppub;
+                            //k-anycast: get all the IIDs don't care the prefix
+                            IIDs.find_insert((*pub_it)._iipointer->ids.begin()->first.substring((*pub_it)._iipointer->ids.begin()->first.length()-\
+                                                                               PURSUIT_ID_LEN, PURSUIT_ID_LEN)) ;
+                            (*pub_it)._iipointer->getPublishers(temppub) ;
+                            for(RemoteHostSetIter pubiter = temppub.begin() ; pubiter != temppub.end() ; pubiter++)
+                            {
+                                publishers.find_insert(*pubiter) ;
                             }
-                            rendezvous((*pub_it)._iipointer, subscribers);
                         }
+                        StringSet SIDs ;
+                        //get all the SIDs that represent this scope
+                        sc->getIDs(SIDs) ;
+                        SIDs.find_insert(fullID) ;
+                        kanycast_notifySubscribers(INFO_PUBLISHED, IIDs, strategy, subscribers, SIDs, publishers.size()) ;
+                        kanycast_rendezvous(publishers, subscribers, SIDs, strategy) ;
                         ret = SUCCESS;
+
+//                        /*add the scope to the subscriber's set*/
+//                        _subscriber->subscribedScopes.find_insert(StringSetItem(fullID));
+//                        click_chatter("LocalRV: added subscriber %s to scope %s(%d)", _subscriber->remoteHostID.c_str(), sc->printID().c_str(), (int) strategy);
+//                        /*first notify the subscriber about the existing subscopes*/
+//                        RemoteHostSet subscribers;
+//                        ScopeSet _subscopes;
+//                        subscribers.find_insert(RemoteHostSetItem(_subscriber));
+//                        sc->getSubscopes(_subscopes);
+//                        for (ScopeSetIter sc_set_it = _subscopes.begin(); sc_set_it != _subscopes.end(); sc_set_it++) {
+//                            StringSet _ids;
+//                            (*sc_set_it)._scpointer->getIDs(_ids);
+//                            notifySubscribers(SCOPE_PUBLISHED, _ids, (*sc_set_it)._scpointer->strategy, subscribers);
+//                        }
+//                        /*then find all InformationItems for which the _subscriber is interested in*/
+//                        InformationItemSet _informationitems;
+//                        sc->getInformationItems(_informationitems);
+//                        /*then, for each one do the rendez-vous process*/
+//                        InformationItemSetIter pub_it;
+//                        for (pub_it = _informationitems.begin(); pub_it != _informationitems.end(); pub_it++) {
+//                            RemoteHostSet subscribers;
+//                            (*pub_it)._iipointer->getSubscribers(subscribers);
+//                            /*careful here...I have multiple fathers*/
+//                            ScopeSetIter fathersc_it;
+//                            for (fathersc_it = (*pub_it)._iipointer->fatherScopes.begin(); fathersc_it != (*pub_it)._iipointer->fatherScopes.end(); fathersc_it++) {
+//                                (*fathersc_it)._scpointer->getSubscribers(subscribers);
+//                            }
+//                            rendezvous((*pub_it)._iipointer, subscribers);
+//                        }
+//                        ret = SUCCESS;
                     } else {
                         ret = EXISTS;
                     }
@@ -1208,6 +1288,86 @@ void LocalRV::requestTMAssistanceForRendezvous(InformationItem *pub, RemoteHostS
     output(0).push(p);
 }
 
+void LocalRV::kanycast_askTMforRendezvous(RemoteHostSet& _publishers, RemoteHostSet& _subscribers, StringSet& SIDs, unsigned char _strategy)
+{
+    int packet_len;
+    WritablePacket *p;
+    /********FOR THE API*********/
+    unsigned char typeForAPI = PUBLISH_DATA;
+    unsigned char IDLenForAPI = 2 * PURSUIT_ID_LEN / PURSUIT_ID_LEN;
+    unsigned char strategy = IMPLICIT_RENDEZVOUS;
+    /****************************/
+    unsigned char request_type = SCOPE_MATCH_PUB_SUB;
+    unsigned char no_publishers = _publishers.size();
+    int publisher_index = 0;
+    unsigned char no_subscribers = _subscribers.size();
+    int subscriber_index = 0;
+    unsigned char no_ids = SIDs.size();
+    unsigned char IDs_total_bytes = 0;
+    int ids_index = 0;
+    for (StringSetIter iter = SIDs.begin(); iter != SIDs.end(); iter++) {
+        IDs_total_bytes += (*iter)._strData.length();
+    }
+    /*allocate the packet*/
+    packet_len = /*For the blackadder API*/ sizeof (typeForAPI) +\
+                sizeof (IDLenForAPI) + 2 * PURSUIT_ID_LEN + sizeof (strategy) + FID_LEN/*END OF API*/\
+            /*PAYLOAD*/ + sizeof (request_type) + sizeof (_strategy) +\
+            sizeof (no_publishers) /*sizeof(numberOfPubs)*/ +\
+            _publishers.size() * NODEID_LEN + sizeof (no_subscribers) /*sizeof(numberOfSubs)*/\
+            + _subscribers.size() * NODEID_LEN + sizeof (no_ids) /*sizeof(numberOFIDs)*/+\
+            no_ids * sizeof (unsigned char)/*# of fragments for each ID*/+IDs_total_bytes;
+    p = Packet::make(50, NULL, packet_len, 0);
+    /*For the API*/
+    memcpy(p->data(), &typeForAPI, sizeof (typeForAPI));
+    memcpy(p->data() + sizeof (typeForAPI), &IDLenForAPI, sizeof (IDLenForAPI));
+    memcpy(p->data() + sizeof (typeForAPI) + sizeof (IDLenForAPI), gc->nodeTMScope.c_str(), gc->nodeTMScope.length());
+    memcpy(p->data() + sizeof (typeForAPI) + sizeof (IDLenForAPI) + gc->nodeTMScope.length(), &strategy, sizeof (strategy));
+    memcpy(p->data() + sizeof (typeForAPI) + sizeof (IDLenForAPI) + gc->nodeTMScope.length() + sizeof (strategy), gc->TMFID._data, FID_LEN);
+    /*Put the payload*/
+    memcpy(p->data() + sizeof (typeForAPI) + sizeof (IDLenForAPI) + gc->nodeTMScope.length() \
+    		+ sizeof (strategy) + FID_LEN, &request_type, sizeof (request_type));
+    /*put the dissemination strategy of pub*/
+    memcpy(p->data() + sizeof (typeForAPI) + sizeof (IDLenForAPI) + gc->nodeTMScope.length()\
+    		+ sizeof (strategy) + FID_LEN + sizeof (request_type), &_strategy, sizeof (_strategy));
+    /*put the publisher IDs*/
+    memcpy(p->data() + sizeof (typeForAPI) + sizeof (IDLenForAPI) + gc->nodeTMScope.length() \
+    		+ sizeof (strategy) + FID_LEN + sizeof (request_type) + sizeof (_strategy), &no_publishers, sizeof (no_publishers));
+    for (RemoteHostSetIter iter = _publishers.begin(); iter != _publishers.end(); iter++) {
+        memcpy(p->data() + sizeof (typeForAPI) + sizeof (IDLenForAPI) + gc->nodeTMScope.length() \
+			+ sizeof (strategy) + FID_LEN + sizeof (request_type) + sizeof (_strategy) +\
+               sizeof (no_publishers) + publisher_index, (*iter)._rhpointer->remoteHostID.c_str(), (*iter)._rhpointer->remoteHostID.length());
+        publisher_index += (*iter)._rhpointer->remoteHostID.length();
+    }
+    /*put the subscriber IDs*/
+    memcpy(p->data() + sizeof (typeForAPI) + sizeof (IDLenForAPI) + gc->nodeTMScope.length() + sizeof (strategy) +\
+           FID_LEN + sizeof (request_type) + sizeof (_strategy) + sizeof (no_publishers) + publisher_index, &no_subscribers, sizeof (no_subscribers));
+    for (RemoteHostSetIter iter = _subscribers.begin(); iter != _subscribers.end(); iter++) {
+        memcpy(p->data() + sizeof (typeForAPI) + sizeof (IDLenForAPI) + gc->nodeTMScope.length() +\
+               sizeof (strategy) + FID_LEN + sizeof (request_type) + sizeof (_strategy) +\
+               sizeof (no_publishers) + publisher_index + sizeof (no_subscribers) + subscriber_index,\
+               (*iter)._rhpointer->remoteHostID.c_str(), (*iter)._rhpointer->remoteHostID.length());
+        subscriber_index += (*iter)._rhpointer->remoteHostID.length();
+    }
+    memcpy(p->data() + sizeof (typeForAPI) + sizeof (IDLenForAPI) + gc->nodeTMScope.length() +\
+           sizeof (strategy) + FID_LEN + sizeof (request_type) + sizeof (_strategy) +\
+           sizeof (no_publishers) + publisher_index + sizeof (no_subscribers) + subscriber_index, &no_ids, sizeof (no_ids));
+    /*put the pathIDs of the information item*/
+    for (StringSetIter iter = SIDs.begin(); iter != SIDs.end(); iter++) {
+        unsigned char IDLength = (unsigned char) (*iter)._strData.length() / PURSUIT_ID_LEN;
+        memcpy(p->data() + sizeof (typeForAPI) + sizeof (IDLenForAPI) + gc->nodeTMScope.length() +\
+            sizeof (strategy) + FID_LEN + sizeof (request_type) + sizeof (_strategy) +\
+            sizeof (no_publishers) + publisher_index + sizeof (no_subscribers) + subscriber_index +\
+            sizeof (no_ids) + ids_index, &IDLength, sizeof (IDLength));
+        memcpy(p->data() + sizeof (typeForAPI) + sizeof (IDLenForAPI) + gc->nodeTMScope.length() +\
+               sizeof (strategy) + FID_LEN + sizeof (request_type) + sizeof (_strategy) +\
+               sizeof (no_publishers) + publisher_index + sizeof (no_subscribers) + subscriber_index+\
+               sizeof (no_ids) + ids_index + sizeof (IDLength), (*iter)._strData.c_str(), (*iter)._strData.length());
+        ids_index += sizeof (IDLength) + (*iter)._strData.length();
+    }
+    p->set_anno_u32(0, RV_ELEMENT);
+    output(0).push(p);
+}
+
 void LocalRV::requestTMAssistanceForNotifyingSubscribers(unsigned char request_type, StringSet &IDs, RemoteHostSet &_subscribers, unsigned char strategy) {
     /*Publish a request to the TM*/
     int packet_len;
@@ -1257,6 +1417,88 @@ void LocalRV::requestTMAssistanceForNotifyingSubscribers(unsigned char request_t
     output(0).push(p);
 }
 
+void LocalRV::kanycast_askTMforNotifySub(unsigned char request_type, StringSet& IIDs, unsigned char strategy,\
+                                         RemoteHostSet& _subscribers, StringSet& SIDs, unsigned int noofpub)
+{
+    /*Publish a request to the TM*/
+    int packet_len;
+    WritablePacket *p;
+    /********FOR THE API*********/
+    unsigned char typeForAPI = PUBLISH_DATA;
+    unsigned char IDLenForAPI = 2 * PURSUIT_ID_LEN / PURSUIT_ID_LEN;
+    unsigned char strategyAPI = IMPLICIT_RENDEZVOUS;
+    /****************************/
+    unsigned char no_subscribers = _subscribers.size();
+    int subscriber_index = 0;
+    unsigned char no_sids = SIDs.size();
+    unsigned char SIDs_total_bytes = 0;
+    unsigned char no_iids = IIDs.size() ;
+    int sids_index = 0;
+    int iids_index = 0 ;
+    for (StringSetIter iter = SIDs.begin(); iter != SIDs.end(); iter++) {
+        SIDs_total_bytes += (*iter)._strData.length();
+    }
+    /*allocate the packet*/
+    packet_len = /*For the blackadder API*/ sizeof (typeForAPI) + sizeof (IDLenForAPI) + gc->nodeTMScope.length() + sizeof (strategyAPI) + FID_LEN/*END OF API*/\
+    /*PAYLOAD*/ + sizeof (request_type) + sizeof (strategy) + sizeof (no_subscribers) /*sizeof(numberOfSubs)*/ +\
+    _subscribers.size() * NODEID_LEN + sizeof (no_sids) /*sizeof(numberOfpathIDs)*/ + SIDs.size() * sizeof (unsigned char) +SIDs_total_bytes+\
+    /*kanycast*/sizeof(no_iids)/*#ofiids*/+no_iids*PURSUIT_ID_LEN/*all the iids*/+sizeof(noofpub)/*#ofpub*/;
+    p = Packet::make(50, NULL, packet_len, 0);
+    /*For the API*/
+    memcpy(p->data(), &typeForAPI, sizeof (typeForAPI));
+    memcpy(p->data() + sizeof (typeForAPI), &IDLenForAPI, sizeof (IDLenForAPI));
+    memcpy(p->data() + sizeof (typeForAPI) + sizeof (IDLenForAPI), gc->nodeTMScope.c_str(), gc->nodeTMScope.length());
+    memcpy(p->data() + sizeof (typeForAPI) + sizeof (IDLenForAPI) + gc->nodeTMScope.length(), &strategyAPI, sizeof (strategyAPI));
+    memcpy(p->data() + sizeof (typeForAPI) + sizeof (IDLenForAPI) + gc->nodeTMScope.length() + sizeof (strategyAPI), gc->TMFID._data, FID_LEN);
+    /*Put the payload*/
+    memcpy(p->data() + sizeof (typeForAPI) + sizeof (IDLenForAPI) + gc->nodeTMScope.length() + sizeof (strategyAPI) + FID_LEN, &request_type, sizeof (request_type));
+    /*put the dissemination strategy of scope*/
+    memcpy(p->data() + sizeof (typeForAPI) + sizeof (IDLenForAPI) + gc->nodeTMScope.length() + sizeof (strategyAPI) + FID_LEN + sizeof (request_type), &strategy, sizeof (strategy));
+    /*put the subscriber IDs*/
+    memcpy(p->data() + sizeof (typeForAPI) + sizeof (IDLenForAPI) + gc->nodeTMScope.length() + sizeof (strategyAPI) + FID_LEN + sizeof (request_type) + sizeof (strategy), &no_subscribers, sizeof (no_subscribers));
+    for (RemoteHostSetIter iter = _subscribers.begin(); iter != _subscribers.end(); iter++) {
+        memcpy(p->data() + sizeof (typeForAPI) + sizeof (IDLenForAPI) + gc->nodeTMScope.length() + sizeof (strategyAPI) + FID_LEN + sizeof (request_type) + sizeof (strategy) + sizeof (no_subscribers) + subscriber_index, (*iter)._rhpointer->remoteHostID.c_str(), (*iter)._rhpointer->remoteHostID.length());
+        subscriber_index += (*iter)._rhpointer->remoteHostID.length();
+    }
+    memcpy(p->data() + sizeof (typeForAPI) + sizeof (IDLenForAPI) + gc->nodeTMScope.length() +\
+           sizeof (strategyAPI) + FID_LEN + sizeof (request_type) + sizeof (strategy) +\
+           sizeof (no_subscribers) + subscriber_index, &no_sids, sizeof (no_sids));
+    /*put the pathIDs of the information item*/
+    for (StringSetIter iter = SIDs.begin(); iter != SIDs.end(); iter++) {
+        unsigned char IDLength = (unsigned char) (*iter)._strData.length() / PURSUIT_ID_LEN;
+        memcpy(p->data() + sizeof (typeForAPI) + sizeof (IDLenForAPI) + gc->nodeTMScope.length() +\
+               sizeof (strategyAPI) + FID_LEN + sizeof (request_type) + sizeof (strategy) +\
+               sizeof (no_subscribers) + subscriber_index + sizeof (no_sids) + sids_index, &IDLength, sizeof (IDLength));
+        memcpy(p->data() + sizeof (typeForAPI) + sizeof (IDLenForAPI) + gc->nodeTMScope.length() +\
+               sizeof (strategyAPI) + FID_LEN + sizeof (request_type) + sizeof (strategy) +\
+               sizeof (no_subscribers) + subscriber_index + sizeof (no_sids) + sids_index +\
+               sizeof (IDLength), (*iter)._strData.c_str(), (*iter)._strData.length());
+        sids_index += sizeof (IDLength) + (*iter)._strData.length();
+    }
+    /*kanycast*/
+    //add # of information id
+    memcpy(p->data() + sizeof (typeForAPI) + sizeof (IDLenForAPI) + gc->nodeTMScope.length() +\
+            sizeof (strategyAPI) + FID_LEN + sizeof (request_type) + sizeof (strategy) +\
+            sizeof (no_subscribers) + subscriber_index + sizeof (no_sids) + sids_index, &no_iids, sizeof(no_iids)) ;
+    //add all the information id
+    for(StringSetIter iter = IIDs.begin() ; iter != IIDs.end() ; iter++)
+    {
+        memcpy(p->data() + sizeof (typeForAPI) + sizeof (IDLenForAPI) + gc->nodeTMScope.length() +\
+            sizeof (strategyAPI) + FID_LEN + sizeof (request_type) + sizeof (strategy) +\
+            sizeof (no_subscribers) + subscriber_index + sizeof (no_sids) + sids_index+sizeof(no_iids)+iids_index*PURSUIT_ID_LEN,\
+            (*iter)._strData.c_str(),(*iter)._strData.length()) ;
+        iids_index += PURSUIT_ID_LEN ;
+    }
+    //add # of publishers
+    memcpy(p->data() + sizeof (typeForAPI) + sizeof (IDLenForAPI) + gc->nodeTMScope.length() +\
+            sizeof (strategyAPI) + FID_LEN + sizeof (request_type) + sizeof (strategy) +\
+            sizeof (no_subscribers) + subscriber_index + sizeof (no_sids) + sids_index+\
+            sizeof(no_iids)+iids_index*PURSUIT_ID_LEN, &noofpub, sizeof(noofpub)) ;
+    p->set_anno_u32(0, RV_ELEMENT);
+    output(0).push(p);
+}
+
+
 void LocalRV::rendezvous(InformationItem *pub, RemoteHostSet &_subscribers) {
     //click_chatter("rendezvous");
     RemoteHostSet _publishers;
@@ -1273,6 +1515,18 @@ void LocalRV::rendezvous(InformationItem *pub, RemoteHostSet &_subscribers) {
         } else if (pub->strategy == DOMAIN_LOCAL) {
             requestTMAssistanceForRendezvous(pub, _publishers, _subscribers, pub->ids);
         }
+    }
+}
+void LocalRV::kanycast_rendezvous(RemoteHostSet& pub, RemoteHostSet& sub, StringSet& SIDs, unsigned char strategy)
+{
+    if(strategy == DOMAIN_LOCAL)
+    {
+        if(pub.size() > 0 && sub.size() > 0)
+            kanycast_askTMforRendezvous(pub, sub, SIDs, strategy) ;
+    }
+    else
+    {
+        click_chatter("only work in DOMAIN_LOCAL strategy") ;
     }
 }
 
@@ -1334,6 +1588,19 @@ void LocalRV::notifySubscribers(unsigned char type, StringSet &IDs, unsigned cha
         if (subscribers.size() > 0) {
             requestTMAssistanceForNotifyingSubscribers(type, IDs, subscribers, strategy);
         }
+    }
+}
+
+void LocalRV::kanycast_notifySubscribers(unsigned char type, StringSet& IIDs, unsigned char strategy, RemoteHostSet& sub, StringSet& SIDs, unsigned int noofpub)
+{
+    if(strategy == DOMAIN_LOCAL)
+    {
+        if(sub.size() > 0)
+            kanycast_askTMforNotifySub(type, IIDs, strategy, sub, SIDs, noofpub) ;
+    }
+    else
+    {
+        click_chatter("only work in DOMAIN_LOCAL strategy") ;
     }
 }
 

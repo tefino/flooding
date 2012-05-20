@@ -78,6 +78,10 @@ public:
      *FID to each remote subscriber
      *key:SubID element:FID*/
     HashTable<String, BABitvector> FID_to_eachsub ;
+    /**@brief kanycast
+     * if this is a scope IIDs store the informatin itmes published under this scope( not include the decsendent in the subgraph)
+     */
+    StringSet IIDs ;
 };
 
 /**
@@ -132,6 +136,18 @@ public:
     unsigned char origin ;
     int noofpub ;
     String notificationIID ;
+    /**@brief kanycast
+     * these varibles only work in scope*/
+    bool probing_received ;
+    /**@brief in case of probing message arrived first, cache the probing message,
+     * until the notification message arrive
+     */
+    Vector<String> temp_probing_message ;
+    StringSet IIDs ;
+    int noofiipub ;
+    int noofrcvpub ;
+    HashTable<String, BABitvector> iid_FID_map ;
+    HashTable<String, double> iid_distance_map ;
 };
 
 CLICK_ENDDECLS

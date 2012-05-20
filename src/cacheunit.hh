@@ -2,6 +2,7 @@
 #define CACHEUNIT_HH_INCLUDED
 
 #include "globalconf.hh"
+#include "bloomfilter.hh"
 
 #include <click/etheraddress.hh>
 CLICK_DECLS
@@ -51,6 +52,7 @@ public:
     bool matchIID(Vector<String>&) ;
 
     bool matchSID(String) ;
+    bool matchSID(Vector<String> _SIDs) ;
     /**@brief
      * ScopeIDs that identify the Scope, since multiple SIDs may refer to the same Scope*/
     Vector<String> SIDs ;
@@ -116,6 +118,8 @@ public:
        if there is any cache hit. If there is, Cacheunit should modify the probing message's content.
      */
     void push(int port, Packet *p) ;
+    /**@brief send back data, only work for kanycast*/
+    void sendbackData(Vector<String>& SIDs, Vector<String>& IIDs, BABitvector FID, CacheEntry* ce) ;
     /**@brief store the cache*/
     void storecache(Vector<String>&, char*, unsigned int) ;
     /**

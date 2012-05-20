@@ -71,6 +71,29 @@ void LocalProxy::push(int in_port, Packet * p) {
     BABitvector FID_to_subscribers;
     String ID, prefixID;
     index = 0;
+    if(in_port == 4)
+    {
+        memcpy(&type, p->data()+FID_LEN, sizeof(type)) ;
+        memcpy(&numberOfIDs, p->data()+FID_LEN+sizeof(type), sizeof(numberOfIDs)) ;
+        for (int i = 0; i < (int) numberOfIDs; i++) {
+            IDLength = *(p->data() + FID_LEN+sizeof(type) + sizeof (numberOfIDs) + index);
+            IDs.push_back(String((const char *) (p->data() + FID_LEN+sizeof(type) + sizeof (numberOfIDs) + sizeof (IDLength) + index), IDLength * PURSUIT_ID_LEN));
+            index = index + sizeof (IDLength) + IDLength * PURSUIT_ID_LEN;
+        }
+        switch (type)
+        {
+            case SCOPE_PROBING_MESSAGE:
+            {
+                handleScopeProbingMessage(IDs, p) ;
+                break ;
+            }
+            case SUB_SCOPE_MESSAGE:
+            {
+                p->pull(FID_LEN+sizeof(type)+sizeof(numberOfIDs)+index) ;
+                notifyPubScopeInfoSub(IDs, p) ;
+            }
+        }
+    }
     if(in_port == 3)
     {//receive a probing message
         BABitvector incoming_FID(FID_LEN*8) ;
@@ -286,6 +309,20 @@ bool LocalProxy::handleLocalRequest(unsigned char &type, LocalHost *_localhost, 
 /*store the remote scope for the _publisher..forward the message to the RV point only if this is the first time the scope is published.
  If not, the RV point already knows about this node's publication...Note that RV points know only about network nodes - NOT for processes or click modules*/
 bool LocalProxy::storeActivePublication(LocalHost *_publisher, String &fullID, unsigned char strategy, BABitvector &RVFID, bool isScope) {
+    if(!isScope)
+    {
+        //kanycast if publish a information, save it in its father scope
+        ActivePublication *fatherscope ;
+        String fatherscopeID = fullID.substring(0 ,fullID.length()-PURSUIT_ID_LEN) ;
+        fatherscope = activePublicationIndex.get(fatherscopeID) ;
+        if(fatherscope != activePublicationIndex.default_value())
+        {
+            fatherscope->IIDs.find_insert(fullID.substring(fullID.length()-PURSUIT_ID_LEN, PURSUIT_ID_LEN)) ;
+        }else
+        {
+            click_chatter("localProxy storeActivePublication: scope not published yet") ;
+        }
+    }
     ActivePublication *ap;
     if ((strategy == NODE_LOCAL) || (strategy == DOMAIN_LOCAL)) {
         ap = activePublicationIndex.get(fullID);
@@ -320,6 +357,20 @@ bool LocalProxy::storeActivePublication(LocalHost *_publisher, String &fullID, u
 
 /*delete the remote publication for the _publisher..forward the message to the RV point only if there aren't any other publishers or subscribers for this scope*/
 bool LocalProxy::removeActivePublication(LocalHost *_publisher, String &fullID, unsigned char strategy) {
+    if(!isScope)
+    {
+        //kanycast if publish a information, save it in its father scope
+        ActivePublication *fatherscope ;
+        String fatherscopeID = fullID.substring(0 ,fullID.length()-PURSUIT_ID_LEN) ;
+        fatherscope = activePublicationIndex.get(fatherscopeID) ;
+        if(fatherscope != activePublicationIndex.default_value())
+        {
+            fatherscope->IIDs.erase(fullID.substring(fullID.length()-PURSUIT_ID_LEN, PURSUIT_ID_LEN)) ;
+        }else
+        {
+            click_chatter("localProxy removeActivePublication: scope not published yet") ;
+        }
+    }
     ActivePublication *ap;
     if ((strategy == NODE_LOCAL) || (strategy == DOMAIN_LOCAL)) {
         ap = activePublicationIndex.get(fullID);
@@ -589,6 +640,77 @@ void LocalProxy::handleRVNotification(Packet *p) {
                 }
             }
             break ;
+        //kanycast notify the sub the information items under the scope he/she just subscribed
+        case INFO_PUBLISHED:
+        {
+            unsigned char noofiids ;
+            StringSet IIDs ;
+            int noofpub ;
+            int i ;
+            memcpy(&noofiids, p->data() + sizeof (type) + sizeof (numberOfIDs) + index, sizeof(noofiids)) ;
+            for(i = 0 ; i < (int)noofiids ; i++)
+            {
+                IIDs.find_insert(String((const char *) (p->data() + sizeof (type) + sizeof (numberOfIDs) +\
+                                index + sizeof(noofiids)+i*PURSUIT_ID_LEN), PURSUIT_ID_LEN)) ;
+            }
+            memcpy(&noofpub, p->data() + sizeof (type) + sizeof (numberOfIDs) +\
+                                index + sizeof(noofiids)+i*PURSUIT_ID_LEN, sizeof(noofpub)) ;
+            //save iid to ativesub, notify subscriber
+            for(i = 0 ; i < (int) numberOfIDs ; i++)
+            {
+                ActiveSubscription *as;
+                LocalHostSetIter set_it;
+                as = activeSubscriptionIndex.get(IDs[i]);
+                if (as != activeSubscriptionIndex.default_value()) {
+                    if (as->isScope) {
+                        for (set_it = as->subscribers.begin(); set_it != as->subscribers.end(); set_it++) {
+                            //sendNotificationLocally(*set_it);
+
+                        }
+                        as->probing_received = true ;
+                        as->IIDs = IIDs ;
+                        as->noofiipub = noofpub ;
+                        for(Vector<String>::iterator iter = as->temp_probing_message.begin() ; iter !=\
+                            as->temp_probing_message.end() ; iter++)
+                        {
+                            WritablePacket* p ;
+                            p = Packet::make(iter->length()) ;
+                            memcpy(p->data(), iter->c_str(), iter->length()) ;
+                            Vector<String> tempid ;
+                            tempid.push_back(IDs[i]) ;
+                            handleScopeProbingMessage(tempid, p) ;
+                        }
+                        as->temp_probing_message.clear() ;
+                    }
+                }
+            }
+            break ;
+        }
+        case SCOPE_PROBING:
+        {
+            unsigned char no_sub ;
+            no_sub = *(p->data() + sizeof (type) + sizeof (numberOfIDs) + index ) ;
+            HashTable<String, BABitvector> sub_FID ;
+            HashTable<String, unsigned int> hopcount ;
+            int noofpub ;//our proposal anycast for number of publishers
+            for(int i = 0 ; i < no_sub ; i++)
+            {
+                String temp_sub((const char*)(p->data() + sizeof (type) + sizeof (numberOfIDs) + index+\
+                                sizeof(no_sub)+i*PURSUIT_ID_LEN+i*FID_LEN+i*sizeof(int)), PURSUIT_ID_LEN) ;
+                BABitvector temp_FID(FID_LEN*8) ;
+                unsigned int temp_hop ;
+                memcpy(temp_FID._data, p->data() + sizeof (type) + sizeof (numberOfIDs) + index+ sizeof(no_sub)+\
+                        i*PURSUIT_ID_LEN+i*FID_LEN+i*sizeof(int)+PURSUIT_ID_LEN, FID_LEN) ;
+                memcpy(&temp_hop, p->data() + sizeof (type) + sizeof (numberOfIDs) + index+ sizeof(no_sub)+\
+                        i*PURSUIT_ID_LEN+i*FID_LEN+i*sizeof(int)+PURSUIT_ID_LEN+FID_LEN,sizeof(temp_hop)) ;
+                if(temp_FID.zero())
+                    continue ;
+                sub_FID.find_insert(temp_sub,temp_FID) ;
+                hopcount.find_insert(temp_sub, temp_hop) ;
+            }
+            sendScopeProbingMessage(IDs, sub_FID, hopcount) ;
+            break ;
+        }
         default:
             //click_chatter("LocalProxy: FATAL - didn't understand the RV notification");
             break;
@@ -1310,6 +1432,246 @@ void LocalProxy::handleProbingMessage(Vector<String> IDs, Packet* p, BABitvector
         }
     }
 }
+
+void LocalProxy::sendScopeProbingMessage(Vector<String> IDs, HashTable<String, BABitvector> FID_to_each_sub,\
+                                 HashTable<String, unsigned int> each_sub_hopcount)
+{
+    unsigned char type = SCOPE_PROBING_MESSAGE ;
+    HashTable<String, BABitvector>::iterator str_map_iter ;
+    char* probingchar ;
+    Vector<String>::iterator vec_str_iter ;
+    int packet_len_without_FID ;
+    int total_ID_length = 0 ;
+    unsigned char NOofID = IDs.size() ;
+    int IDindex = 0 ;
+    unsigned int hop_count = 0 ;
+    unsigned int hop_passed = 0 ;
+    unsigned int total_distance = 0 ;
+    unsigned int noofcache = 0 ;
+    unsigned char IDLength /*in fragments*/ ;
+
+    BloomFilter BFforIID(IBFSIZE*8) ;//Bloom Filter for Information ID
+    int numberOfIID = 0 ;//# of Information ID
+    for( vec_str_iter = IDs.begin() ; vec_str_iter != IDs.end() ; vec_str_iter++)
+    {
+        total_ID_length += vec_str_iter->length() ;
+    }
+    packet_len_without_FID = sizeof(type)/*type*/+sizeof(NOofID)/*numberofID*/+NOofID*sizeof(IDLength)/*number of fragment*/+\
+                 total_ID_length/*IDs*/+IBFSIZE/*bloom filter*/+FID_LEN/*reverse_path*/+\
+                 sizeof(hop_passed)/*hop passed*/+sizeof(total_distance)/*total distance for avg calc*/+\
+                 sizeof(noofcache)/*# of cache for avg calc*/+sizeof(unsigned int)/*hop count*/ ;
+    probingchar = (char*)malloc(packet_len_without_FID) ;
+    memcpy(probingchar, &type, sizeof(type)) ;
+    memcpy(probingchar+sizeof(type), &NOofID, sizeof(NOofID)) ;//#ofID
+
+    for( vec_str_iter = IDs.begin() ; vec_str_iter != IDs.end() ;vec_str_iter++)//ID length ID
+    {
+        IDLength = vec_str_iter->length()/PURSUIT_ID_LEN ;
+        memcpy(probingchar+sizeof(type)+sizeof(NOofID)+IDindex, &IDLength, sizeof(IDLength)) ;
+        memcpy(probingchar+sizeof(type)+sizeof(NOofID)+IDindex+sizeof(IDLength), vec_str_iter->c_str(),vec_str_iter->length()) ;
+        IDindex += sizeof(IDLength)+vec_str_iter->length() ;
+    }
+
+    memcpy(probingchar+sizeof(type)+sizeof(NOofID)+IDindex, BFforIID.data._data, IBFSIZE) ;
+    memcpy(probingchar+sizeof(type)+sizeof(NOofID)+IDindex+IBFSIZE, gc->iLID._data, FID_LEN) ;//reverse FID
+    memcpy(probingchar+sizeof(type)+sizeof(NOofID)+IDindex+IBFSIZE+FID_LEN, &hop_passed, sizeof(hop_passed)) ;//hop count
+    memcpy(probingchar+sizeof(type)+sizeof(NOofID)+IDindex+IBFSIZE+FID_LEN+sizeof(hop_passed),\
+           &total_distance, sizeof(total_distance)) ;
+    memcpy(probingchar+sizeof(type)+sizeof(NOofID)+IDindex+IBFSIZE+FID_LEN+sizeof(hop_passed)+sizeof(total_distance),\
+           &noofcache, sizeof(noofcache)) ;
+
+    for(str_map_iter = FID_to_each_sub.begin() ; str_map_iter != FID_to_each_sub.end() ; str_map_iter++)
+    {
+        hop_count = each_sub_hopcount.get(str_map_iter->first) ;
+        memcpy(probingchar+sizeof(type)+sizeof(NOofID)+IDindex+IBFSIZE+FID_LEN+sizeof(hop_passed)+\
+               sizeof(total_distance)+sizeof(noofcache), &hop_count, sizeof(hop_count)) ;
+        WritablePacket* probingmessage = Packet::make(50, NULL, packet_len_without_FID+FID_LEN, 50) ;
+        memcpy(probingmessage->data(), str_map_iter->second._data, FID_LEN) ;//FID
+        memcpy(probingmessage->data()+FID_LEN, probingchar, packet_len_without_FID) ;
+        output(6).push(probingmessage) ;
+    }
+    free(probingchar) ;
+}
+
+void LocalProxy::handleScopeProbingMessage(Vector<String> IDs, Packet* p)
+{
+    unsigned char numberOfIDs, IDLength /*in fragments of PURSUIT_ID_LEN each*/, prefixIDLength /*in fragments of PURSUIT_ID_LEN each*/, strategy;
+    int index = 0;
+    BloomFilter cbf(IBFSIZE*8) ;
+    unsigned int total_distance ;
+    unsigned int noofcache ;
+    unsigned int hop_count ;
+    double avg_hop_count = 0.0 ;
+    BABitvector to_sub_FID(FID_LEN*8) ;
+    BABitvector to_pub_FID(FID_LEN*8) ;
+    bool subreq_sent = false ;
+
+    memcpy(to_sub_FID._data, p->data(), FID_LEN) ;
+    memcpy(&numberOfIDs, p->data()+FID_LEN+sizeof(unsigned char), sizeof(numberOfIDs)) ;
+    for (int i = 0; i < (int) numberOfIDs; i++) {
+        IDLength = *(p->data() + FID_LEN+sizeof(unsigned char) + sizeof (numberOfIDs) + index);
+        index = index + sizeof (IDLength) + IDLength * PURSUIT_ID_LEN;
+    }
+    memcpy(cbf.data._data, p->data()+IBFSIZE+FID_LEN+sizeof(unsigned char)+sizeof (numberOfIDs)+index, IBFSIZE) ;
+    memcpy(to_pub_FID._data, p->data()+IBFSIZE+FID_LEN+sizeof(unsigned char)+sizeof (numberOfIDs)+index+\
+           IBFSIZE, FID_LEN) ;
+    memcpy(&hop_count, p->data()+FID_LEN+sizeof(unsigned char)+sizeof (numberOfIDs)+index+IBFSIZE+\
+           FID_LEN, sizeof(hop_count)) ;
+    memcpy(&total_distance, p->data()+FID_LEN+sizeof(unsigned char)+sizeof (numberOfIDs)+index+IBFSIZE+\
+           FID_LEN+sizeof(hop_count),sizeof(total_distance)) ;
+    memcpy(&noofcache, p->data()+FID_LEN+sizeof(unsigned char)+sizeof (numberOfIDs)+index+IBFSIZE+\
+           FID_LEN+sizeof(hop_count)+sizeof(total_distance), sizeof(noofcache)) ;
+
+    if(noofcache > 0)
+        avg_hop_count = (double) total_distance/noofcache ;
+
+    ActiveSubscription* as ;
+    for(Vector<String>::iterator iter = IDs.begin() ; iter != IDs.end() ; iter++)
+    {
+        as = activeSubscriptionIndex.get(*iter)  ;
+        if(as == activeSubscriptionIndex.default_value())
+            continue ;
+        if(!as->probing_received)
+        {
+            as->temp_probing_message.push_back(String(p->data(), p->length())) ;
+            continue ;
+        }
+        as->allKnownIDs = IDs ;
+        as->noofrcvpub++ ;
+        double tempdis ;
+        for(StringSetIter iid_iter = as->IIDs.begin() ; iid_iter != as->IIDs.end() ; iid_iter++)
+        {
+            bool cached = false ;
+            cached = cbf.test(iid_iter->_strData) ;
+            tempdis = as->iid_distance_map.get(iid_iter->_strData) ;
+            if(tempdis == as->iid_distance_map.default_value())
+            {
+                as->iid_FID_map.set(iid_iter->_strData, to_pub_FID) ;
+                if(cached)
+                    as->iid_distance_map.set(iid_iter->_strData, avg_hop_count) ;
+                else
+                    as->iid_distance_map.set(iid_iter->_strData, (double)hop_count) ;
+            }
+            else
+            {
+                if(cached && tempdis >= avg_hop_count)
+                {
+                    as->iid_FID_map.set(iid_iter->_strData, to_pub_FID) ;
+                    as->iid_distance_map.set(iid_iter->_strData, avg_hop_count) ;
+                }
+                else if(!cached && tempdis >= hop_count)
+                {
+                    as->iid_FID_map.set(iid_iter->_strData, to_pub_FID) ;
+                    as->iid_distance_map.set(iid_iter->_strData, hop_count) ;
+                }
+            }
+        }
+        if(as->noofrcvpub >= as->noofiipub && !subreq_sent)
+        {
+            subreq_sent = true ;
+            unsigned char type = SUB_SCOPE_MESSAGE ;
+
+            HashTable<String, BloomFilter> strfid_ibf ;
+            for(StringSetIter iid_iter = as->IIDs.begin() ; iid_iter != as->IIDs.end() ; iid_iter++)
+            {//kanycast determine how to retreive the content
+                BloomFilter tempibf(IBFSIZE*8) ;//temp information bloom filter
+                BABitvector tempfid(FID_LEN*8) ;
+                String tempfidstr ;
+                tempfid = as->iid_FID_map.get(iid_iter->_strData) ;
+                tempfidstr = String((const char*)(tempfid._data), FID_LEN) ;
+                tempibf = strfid_ibf.get(tempfidstr) ;
+                if(tempibf == strfid_ibf.default_value())
+                {//if this path hasn't be choosen before, then add the iid to the empty bf
+                    tempibf.zero() ;
+                    tempibf.add2bf(iid_iter->_strData) ;
+                }
+                else
+                    tempibf.add2bf(iid_iter->_strData) ;//if choosen before, just add the iid to it
+                strfid_ibf.set(tempfidstr, tempibf) ;
+
+            }
+            BloomFilter ebf(EBFSIZE*8) ;
+            for(HashTable<String,BloomFilter>::iterator strfid_ibf_iter = strfid_ibf.begin() ;\
+                strfid_ibf_iter != strfid_ibf.end() ; strfid_ibf_iter++)
+            {
+                WritablePacket* packet ;
+                int packet_size = FID_LEN+index+sizeof(type)+EBFSIZE+IBFSIZE+FID_LEN ;
+                packet = Packet::make(packet_size) ;
+
+                memcpy(packet->data(), strfid_ibf_iter->first.c_str(), FID_LEN) ;
+                memcpy(packet->data()+FID_LEN, &type, sizeof(type)) ;
+                memcpy(packet->data()+FID_LEN+sizeof(type), p->data()+FID_LEN+sizeof(type), index) ;
+                memcpy(packet->data()+FID_LEN+sizeof(type)+index, ebf.data._data, EBFSIZE) ;
+                memcpy(packet->data()+FID_LEN+sizeof(type)+index+EBFSIZE, strfid_ibf_iter->second.data._data, IBFSIZE) ;
+                memcpy(packet->data()+FID_LEN+sizeof(type)+index+EBFSIZE+IBFSIZE, to_sub_FID._data, FID_LEN) ;
+                output(6).push(packet) ;
+            }
+        }
+    }
+}
+
+void LocalProxy::notifyPubScopeInfoSub(Vector<String>& SIDs, Packet* p)
+{
+    int numberOfIDs = SIDs.size() ;
+    BloomFilter ebf(EBFSIZE*8) ;
+    BloomFilter ibf(IBFSIZE*8) ;
+    BABitvector to_sub_FID(FID_LEN*8) ;
+    memcpy(ebf.data._data, p->data(), EBFSIZE) ;
+    memcpy(ibf.data._data, p->data()+EBFSIZE, IBFSIZE) ;
+    memcpy(to_sub_FID._data, p->data()+EBFSIZE+IBFSIZE, FID_LEN) ;
+    Vector<String> IIDs ;
+    unsigned char IDLength ;
+
+    unsigned char type = PLEASE_PUSH_DATA ;
+    ActivePublication* ap ;
+    for (int i = 0; i < (int) numberOfIDs; i++)
+    {
+        ap = activePublicationIndex.get(SIDs[i]);
+        IIDs.clear() ;
+        if (ap != activePublicationIndex.default_value())
+        {
+            //for each active pub
+            for(StringSetIter iid_iter = ap->IIDs.begin() ; iid_iter != ap->IIDs.end() ; iid_iter++)
+            {
+                if(!ebf.test(iid_iter->_strData) && ibf.test(iid_iter->_strData))
+                {//check if the pub have the information
+                    IIDs.push_back(iid_iter->_strData) ;
+                }
+            }
+            for(Vector<String>::iterator iid_iter = IIDs.begin() ; iid_iter != IIDs.end() ; iid_iter++)
+            {
+                String ID = SIDs[i]+(*iid_iter) ;
+                for (PublisherHashMapIter publishers_it = ap->publishers.begin(); publishers_it != ap->publishers.end(); publishers_it++)
+                {
+                    (*publishers_it).second = START_PUBLISH;
+                    WritablePacket *packet;
+                    packet = Packet::make(30, NULL, sizeof (unsigned char) /*type*/ +\
+                            sizeof (unsigned char) /*id length*/ +ID.length() /*id*/+FID_LEN/*forwarding FID*/, 0);
+                    IDLength = ID.length() / PURSUIT_ID_LEN;
+                    memcpy(packet->data(), &type, sizeof (char));
+                    memcpy(packet->data() + sizeof (unsigned char), &IDLength, sizeof (unsigned char));
+                    memcpy(packet->data() + sizeof (unsigned char) + sizeof (unsigned char), ID.c_str(), IDLength * PURSUIT_ID_LEN);
+                    memcpy(packet->data() + sizeof (unsigned char) + sizeof (unsigned char)+\
+                           IDLength * PURSUIT_ID_LEN, to_sub_FID._data, FID_LEN) ;
+                    if ((*publishers_it).first->type == CLICK_ELEMENT) {
+                    /*click element don't send this message
+                        output((*publishers_it).first->id).push(packet);*/
+                    } else {
+                        /*set the annotation for the to_netlink element*/
+                        packet->set_anno_u32(0, (*publishers_it).first->id);
+                        //click_chatter("setting annotation: %d", _localhost->id);
+                        output(0).push(packet);
+                        ebf.add2bf(*iid_iter) ;
+                        break;
+                    }
+                }
+            }
+        }
+        if(ebf == ibf)
+            break ;
+    }
+}
+
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(LocalProxy)

@@ -17,6 +17,8 @@
 #include "globalconf.hh"
 #include "localhost.hh"
 #include "activepub.hh"
+#include "bloomfilter.hh"
+
 #include <click/router.hh>
 
 CLICK_DECLS
@@ -324,6 +326,15 @@ public:
      * process probing message
      */
     void handleProbingMessage(Vector<String>, Packet*, BABitvector) ;
+    /**@brief kanycast
+     * notify publisher about a subscription of information under a scope*/
+    void notifyPubScopeInfoSub(Vector<String>&, Packet*) ;
+    /**@brief kanycast
+     * publishers send scope probing messages to each sub
+      */
+    void sendScopeProbingMessage(Vector<String> IDs, HashTable<String, BABitvector> FID_to_each_sub,\
+                                 HashTable<String, unsigned int> each_sub_hopcount) ;
+    void handleScopeProbingMessage(Vector<String> IDs, Packet* p) ;
     /**@brief A pointer to the GlobalConf Element so that LocalProxy can access the node's Global Configuration.
      */
     GlobalConf *gc;

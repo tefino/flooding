@@ -43,17 +43,84 @@ void handleRequest(char *request, int request_len) {
     set<string> publishers;
     set<string> subscribers;
     map<string, map<string,Bitvector *> > opresult = map<string, map<string, Bitvector *> >();
+    map<string, map<string, pair<Bitvector*, unsigned int> > > kanycast_result ;
     map<string, Bitvector *> result = map<string, Bitvector *>();
-    map<string, map<string, Bitvector *> >::iterator map_map_iter;
-    map<string, Bitvector*>::iterator map_iter ;
     unsigned char response_type;
     int idx = 0;
     unsigned char strategy;
     int noofpub ;
     memcpy(&request_type, request, sizeof (request_type));
     memcpy(&strategy , request+ sizeof (request_type), sizeof (strategy));
-    if (request_type == MATCH_PUB_SUBS) {
+    if( request_type == SCOPE_MATCH_PUB_SUB )
+    {
+        map<string, map<string, pair<Bitvector*, unsigned int> > >::iterator map_map_iter;
+        map<string, pair<Bitvector*, unsigned int> >::iterator map_iter ;
+        memcpy(&no_publishers, request + sizeof (request_type) + sizeof (strategy), sizeof (no_publishers));
+        cout << "Publishers: ";
+        for (int i = 0; i < (int) no_publishers; i++) {
+            nodeID = string(request + sizeof (request_type) + sizeof (strategy) + sizeof (no_publishers) + idx, PURSUIT_ID_LEN);
+            cout << nodeID << " ";
+            idx += PURSUIT_ID_LEN;
+            publishers.insert(nodeID);
+        }
+        cout << endl;
+        cout << "Subscribers: ";
+        memcpy(&no_subscribers, request + sizeof (request_type) + sizeof (strategy) + sizeof (no_publishers) + idx, sizeof (no_subscribers));
+        for (int i = 0; i < (int) no_subscribers; i++) {
+            nodeID = string(request + sizeof (request_type) + sizeof (strategy) + sizeof (no_publishers) + sizeof (no_subscribers) + idx, PURSUIT_ID_LEN);
+            cout << nodeID << " ";
+            idx += PURSUIT_ID_LEN;
+            subscribers.insert(nodeID);
+        }
+        cout << endl;
+        tm_igraph.calculateFID(publishers, subscribers, kanycast_result) ;
+        for (map_map_iter = kanycast_result.begin(); map_map_iter != kanycast_result.end(); map_map_iter++) {
+            // cout << "Publisher " << (*map_map_iter).first << ", FID: " << (*map_map_iter).second->to_string() << endl;
+            response_type = SCOPE_PROBING;
+            /*note that request_len includes request_type_len*/
+            int response_size = request_len - sizeof(strategy) - sizeof (no_publishers) -\
+            no_publishers * PURSUIT_ID_LEN - sizeof (no_subscribers) - no_subscribers * PURSUIT_ID_LEN +\
+            sizeof(no_subscribers) + no_subscribers*FID_LEN + no_subscribers*PURSUIT_ID_LEN+no_subscribers*sizeof(int);
+            char *response = (char *) malloc(response_size);
+            memcpy(response, &response_type, sizeof (response_type));//add response_type
+            int ids_index = sizeof (request_type) + sizeof (strategy) + sizeof (no_publishers) +\
+            no_publishers * PURSUIT_ID_LEN + sizeof (no_subscribers) + no_subscribers * PURSUIT_ID_LEN;
+            memcpy(response + sizeof (response_type), request + ids_index, request_len - ids_index);//add ids
+
+            memcpy(response + sizeof (response_type) + request_len - ids_index ,\
+                   &no_subscribers, sizeof(no_subscribers)) ;//add # of sub
+            int i = 0 ;
+            //add each subID and the corresponding FID and hop count
+            for(map_iter = map_map_iter->second.begin() ; map_iter != map_map_iter->second.end() ; map_iter++)
+            {
+                memcpy(response + sizeof (response_type) + request_len - ids_index  +\
+                       sizeof(no_subscribers)+i*PURSUIT_ID_LEN + i*FID_LEN+i*sizeof(int),\
+                       (*map_iter).first.c_str(), PURSUIT_ID_LEN) ;
+                memcpy(response + sizeof (response_type) + request_len - ids_index +\
+                       sizeof(no_subscribers)+i*PURSUIT_ID_LEN + i*FID_LEN +i*sizeof(int)+ PURSUIT_ID_LEN,\
+                       (*map_iter).second.first->_data, FID_LEN);
+                memcpy(response + sizeof (response_type) + request_len - ids_index +\
+                       sizeof(no_subscribers)+i*PURSUIT_ID_LEN + i*FID_LEN + i*sizeof(int)+PURSUIT_ID_LEN+FID_LEN,\
+                       &(*map_iter).second.second, sizeof(unsigned int)) ;
+                i++ ;
+            }
+            for(map_iter = map_map_iter->second.begin() ; map_iter != map_map_iter->second.end() ; map_iter++)
+            {
+                delete map_iter->second.first ;
+            }
+            /*find the FID to the publisher*/
+            string destination = (*map_map_iter).first;
+            Bitvector *FID_to_publisher = tm_igraph.calculateFID(tm_igraph.nodeID, destination);
+            string response_id = resp_bin_prefix_id + (*map_map_iter).first;
+            ba->publish_data(response_id, IMPLICIT_RENDEZVOUS, (char *) FID_to_publisher->_data, FID_LEN, response, response_size);
+            delete FID_to_publisher;
+            free(response);
+        }
+
+    }else if (request_type == MATCH_PUB_SUBS) {
         /*this a request for topology formation*/
+        map<string, map<string, Bitvector* > >::iterator map_map_iter;
+        map<string, Bitvector* >::iterator map_iter ;
         memcpy(&no_publishers, request + sizeof (request_type) + sizeof (strategy), sizeof (no_publishers));
         cout << "Publishers: ";
         for (int i = 0; i < (int) no_publishers; i++) {
@@ -136,7 +203,7 @@ void handleRequest(char *request, int request_len) {
                 free(response);
             }
         }
-    }else if ((request_type == SCOPE_PUBLISHED) || (request_type == SCOPE_UNPUBLISHED)) {
+    }else if ((request_type == SCOPE_PUBLISHED) || (request_type == SCOPE_UNPUBLISHED) || (request_type == INFO_PUBLISHED)) {
         /*this a request to notify subscribers about a new scope*/
         memcpy(&no_subscribers, request + sizeof (request_type) + sizeof (strategy), sizeof (no_subscribers));
         for (int i = 0; i < (int) no_subscribers; i++) {

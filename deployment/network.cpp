@@ -316,7 +316,7 @@ void Domain::writeClickFiles(bool montoolstub) {
         /*Our proposal create a Cacheunit*/
         if (overlay_mode.compare("mac") == 0)
         {
-            click_conf<<"cacheunit"<<"::CacheUnit(globalconf)"<<endl ;
+            click_conf<<"cacheunit"<<"::CacheUnit(globalconf);"<<endl ;
         }
         else
         {

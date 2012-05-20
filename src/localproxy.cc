@@ -357,25 +357,26 @@ bool LocalProxy::storeActivePublication(LocalHost *_publisher, String &fullID, u
 
 /*delete the remote publication for the _publisher..forward the message to the RV point only if there aren't any other publishers or subscribers for this scope*/
 bool LocalProxy::removeActivePublication(LocalHost *_publisher, String &fullID, unsigned char strategy) {
-    if(!isScope)
-    {
-        //kanycast if publish a information, save it in its father scope
-        ActivePublication *fatherscope ;
-        String fatherscopeID = fullID.substring(0 ,fullID.length()-PURSUIT_ID_LEN) ;
-        fatherscope = activePublicationIndex.get(fatherscopeID) ;
-        if(fatherscope != activePublicationIndex.default_value())
-        {
-            fatherscope->IIDs.erase(fullID.substring(fullID.length()-PURSUIT_ID_LEN, PURSUIT_ID_LEN)) ;
-        }else
-        {
-            click_chatter("localProxy removeActivePublication: scope not published yet") ;
-        }
-    }
     ActivePublication *ap;
     if ((strategy == NODE_LOCAL) || (strategy == DOMAIN_LOCAL)) {
         ap = activePublicationIndex.get(fullID);
         if (ap != activePublicationIndex.default_value()) {
             if (ap->strategy == strategy) {
+            	if(!ap->isScope)
+		    {
+		        //kanycast if publish a information, save it in its father scope
+		        ActivePublication *fatherscope ;
+		        String fatherscopeID = fullID.substring(0 ,fullID.length()-PURSUIT_ID_LEN) ;
+		        fatherscope = activePublicationIndex.get(fatherscopeID) ;
+		        if(fatherscope != activePublicationIndex.default_value())
+		        {
+		            fatherscope->IIDs.erase(fullID.substring(fullID.length()-PURSUIT_ID_LEN, PURSUIT_ID_LEN)) ;
+		        }else
+		        {
+		            click_chatter("localProxy removeActivePublication: scope not published yet") ;
+		        }
+		    }
+            	
                 _publisher->activePublications.erase(fullID);
                 ap->publishers.erase(_publisher);
                 //click_chatter("LocalProxy: deleted publisher %s from Active Scope Publication %s", _publisher->publisherID.c_str(), fullID.quoted_hex().c_str());

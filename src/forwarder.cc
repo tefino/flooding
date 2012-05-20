@@ -70,6 +70,7 @@ int Forwarder::configure(Vector<String> &conf, ErrorHandler *errh) {
     subinfo_type = htons(reverse_subinfo) ;
     probing_type = htons(reverse_probing) ;
     datapush_type = htons(reverse_datapush) ;
+    kanycast_type = htons(reverse_kanycast) ;
     if (gc->use_mac == true) {
         cp_integer(conf[1], &number_of_links);
         click_chatter("Forwarder: Number of Links: %d", number_of_links);

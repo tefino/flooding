@@ -361,12 +361,12 @@ void Forwarder::push(int in_port, Packet *p) {
                     p->pull(14);
                     payload = p->uniqueify();
                     memcpy(payload->data()+offset-14, reverse_FID._data, FID_LEN) ;
-                    output(3).push(payload);//push to localproxy via port 2, don't pull the FID
+                    output(4).push(payload);//push to localproxy via port 2, don't pull the FID
                 }
                 if(in_port == 8)
                 {
                     p->pull(14);
-                    output(3).push(p) ;
+                    output(4).push(p) ;
                 }
                 else
                 {

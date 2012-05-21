@@ -330,7 +330,7 @@ void Domain::writeClickFiles(bool montoolstub) {
             for (int j = 0; j < unique_ifaces.size(); j++) {
                 if (montoolstub && j == 0 && (nn->running_mode.compare("user") == 0)) {
                     click_conf << "fw[" << (j + 1) << "]->tsf" << j << "->outc::Counter()->todev" << j << ";" << endl;
-                    click_conf << "fromdev" << j << "->classifier[0]->inc::Counter()  -> [" << (j + 1) << "]fw;" << endl;
+                    click_conf << "fromdev[" << j << "]->classifier[0]->inc::Counter()  -> [" << (j + 1) << "]fw;" << endl;
                 } else {
                     click_conf << "fw[" << (j + 1) << "]->tsf" << j << "->todev" << j << ";" << endl;
                     click_conf << "fromdev" << j << "->classifier[0]->[" << (j + 1) << "]fw;" << endl;

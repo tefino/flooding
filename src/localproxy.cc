@@ -1513,8 +1513,8 @@ void LocalProxy::handleScopeProbingMessage(Vector<String> IDs, Packet* p)
         IDLength = *(p->data() + FID_LEN+sizeof(unsigned char) + sizeof (numberOfIDs) + index);
         index = index + sizeof (IDLength) + IDLength * PURSUIT_ID_LEN;
     }
-    memcpy(cbf.data._data, p->data()+IBFSIZE+FID_LEN+sizeof(unsigned char)+sizeof (numberOfIDs)+index, IBFSIZE) ;
-    memcpy(to_pub_FID._data, p->data()+IBFSIZE+FID_LEN+sizeof(unsigned char)+sizeof (numberOfIDs)+index+\
+    memcpy(cbf.data._data, p->data()+FID_LEN+sizeof(unsigned char)+sizeof (numberOfIDs)+index, IBFSIZE) ;
+    memcpy(to_pub_FID._data, p->data()+FID_LEN+sizeof(unsigned char)+sizeof (numberOfIDs)+index+\
            IBFSIZE, FID_LEN) ;
     memcpy(&hop_count, p->data()+FID_LEN+sizeof(unsigned char)+sizeof (numberOfIDs)+index+IBFSIZE+\
            FID_LEN, sizeof(hop_count)) ;

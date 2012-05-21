@@ -1604,12 +1604,13 @@ void LocalProxy::handleScopeProbingMessage(Vector<String> IDs, Packet* p)
                 int packet_size = FID_LEN+index+sizeof(type)+EBFSIZE+IBFSIZE+FID_LEN ;
                 packet = Packet::make(packet_size) ;
 
-                memcpy(packet->data(), str_fid[strfid_ibf_iter->first]._data, FID_LEN) ;
+		memcpy(packet->data(), str_fid[strfid_ibf_iter->first]._data, FID_LEN) ;
                 memcpy(packet->data()+FID_LEN, &type, sizeof(type)) ;
-                memcpy(packet->data()+FID_LEN+sizeof(type), p->data()+FID_LEN+sizeof(type), index) ;
-                memcpy(packet->data()+FID_LEN+sizeof(type)+index, ebf.data._data, EBFSIZE) ;
-                memcpy(packet->data()+FID_LEN+sizeof(type)+index+EBFSIZE, strfid_ibf_iter->second.data._data, IBFSIZE) ;
-                memcpy(packet->data()+FID_LEN+sizeof(type)+index+EBFSIZE+IBFSIZE, to_sub_FID._data, FID_LEN) ;
+                memcpy(packet->data()+FID_LEN+sizeof(type), &numberOfIDs, sizeof(numberOfIDs)) ;
+                memcpy(packet->data()+FID_LEN+sizeof(type)+sizeof(numberOfIDs), p->data()+FID_LEN+sizeof(type)+sizeof(numberOfIDs), index) ;
+                memcpy(packet->data()+FID_LEN+sizeof(type)+sizeof(numberOfIDs)+index, ebf.data._data, EBFSIZE) ;
+                memcpy(packet->data()+FID_LEN+sizeof(type)+sizeof(numberOfIDs)+index+EBFSIZE, strfid_ibf_iter->second.data._data, IBFSIZE) ;
+                memcpy(packet->data()+FID_LEN+sizeof(type)+sizeof(numberOfIDs)+index+EBFSIZE+IBFSIZE, to_sub_FID._data, FID_LEN) ;
                 output(6).push(packet) ;
             }
         }

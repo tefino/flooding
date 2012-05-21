@@ -1573,14 +1573,18 @@ void LocalProxy::handleScopeProbingMessage(Vector<String> IDs, Packet* p)
             unsigned char type = SUB_SCOPE_MESSAGE ;
 
             HashTable<String, BloomFilter> strfid_ibf ;
+            HashTable<String, BABitvector> str_fid ;
             for(StringSetIter iid_iter = as->IIDs.begin() ; iid_iter != as->IIDs.end() ; iid_iter++)
             {//kanycast determine how to retreive the content
                 BloomFilter tempibf(IBFSIZE*8) ;//temp information bloom filter
                 BABitvector tempfid(FID_LEN*8) ;
                 String tempfidstr ;
+                
                 tempfid = as->iid_FID_map.get(iid_iter->_strData) ;
                 tempfidstr = String((const char*)(tempfid._data), FID_LEN) ;
                 tempibf = strfid_ibf.get(tempfidstr) ;
+                str_fid.set(tempfidstr, tempfid) ;
+                
                 if(tempibf == strfid_ibf.default_value())
                 {//if this path hasn't be choosen before, then add the iid to the empty bf
                     tempibf.zero() ;
@@ -1599,7 +1603,7 @@ void LocalProxy::handleScopeProbingMessage(Vector<String> IDs, Packet* p)
                 int packet_size = FID_LEN+index+sizeof(type)+EBFSIZE+IBFSIZE+FID_LEN ;
                 packet = Packet::make(packet_size) ;
 
-                memcpy(packet->data(), strfid_ibf_iter->first.c_str(), FID_LEN) ;
+                memcpy(packet->data(), str_fid[strfid_ibf_iter->first]._data, FID_LEN) ;
                 memcpy(packet->data()+FID_LEN, &type, sizeof(type)) ;
                 memcpy(packet->data()+FID_LEN+sizeof(type), p->data()+FID_LEN+sizeof(type), index) ;
                 memcpy(packet->data()+FID_LEN+sizeof(type)+index, ebf.data._data, EBFSIZE) ;

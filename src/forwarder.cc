@@ -356,14 +356,14 @@ void Forwarder::push(int in_port, Packet *p) {
                     memcpy(payload->data()+offset-14, reverse_FID._data, FID_LEN) ;
                     output(2).push(payload);//push to localproxy via port 2, don't pull the FID
                 }
-                if(in_port == 7)
+                else if(in_port == 7)
                 {
                     p->pull(14);
                     payload = p->uniqueify();
                     memcpy(payload->data()+offset-14, reverse_FID._data, FID_LEN) ;
                     output(4).push(payload);//push to localproxy via port 2, don't pull the FID
                 }
-                if(in_port == 8)
+                else if(in_port == 8)
                 {
                     p->pull(14);
                     output(4).push(p) ;

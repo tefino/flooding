@@ -91,10 +91,11 @@ void LocalProxy::push(int in_port, Packet * p) {
             {
                 p->pull(FID_LEN+sizeof(type)+sizeof(numberOfIDs)+index) ;
                 notifyPubScopeInfoSub(IDs, p) ;
+                break ;
             }
         }
     }
-    if(in_port == 3)
+    else if(in_port == 3)
     {//receive a probing message
         BABitvector incoming_FID(FID_LEN*8) ;
         index = 0;

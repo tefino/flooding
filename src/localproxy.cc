@@ -1602,7 +1602,7 @@ void LocalProxy::handleScopeProbingMessage(Vector<String> IDs, Packet* p)
                 strfid_ibf_iter != strfid_ibf.end() ; strfid_ibf_iter++)
             {
                 WritablePacket* packet ;
-                int packet_size = FID_LEN+index+sizeof(type)+EBFSIZE+IBFSIZE+FID_LEN ;
+                int packet_size = FID_LEN+sizeof(type)+index+sizeof(numberOfIDs)+EBFSIZE+IBFSIZE+FID_LEN ;
                 packet = Packet::make(packet_size) ;
 
 		memcpy(packet->data(), str_fid[strfid_ibf_iter->first]._data, FID_LEN) ;

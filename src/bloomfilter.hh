@@ -41,6 +41,12 @@ public:
         else
             return false ;
     }
+    inline void resize(int bits)
+    {
+        data.resize(bits) ;
+        len_in_bits = bits ;
+        len_in_bytes = bits/8 ;
+    }
     bool operator==(const BloomFilter &x) const {
         return data == x.data ;
     }

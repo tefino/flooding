@@ -1485,7 +1485,7 @@ void LocalRV::kanycast_askTMforNotifySub(unsigned char request_type, StringSet& 
     {
         memcpy(p->data() + sizeof (typeForAPI) + sizeof (IDLenForAPI) + gc->nodeTMScope.length() +\
             sizeof (strategyAPI) + FID_LEN + sizeof (request_type) + sizeof (strategy) +\
-            sizeof (no_subscribers) + subscriber_index + sizeof (no_sids) + sids_index+sizeof(no_iids)+iids_index*PURSUIT_ID_LEN,\
+            sizeof (no_subscribers) + subscriber_index + sizeof (no_sids) + sids_index+sizeof(no_iids)+iids_index,\
             (*iter)._strData.c_str(),(*iter)._strData.length()) ;
         iids_index += PURSUIT_ID_LEN ;
     }

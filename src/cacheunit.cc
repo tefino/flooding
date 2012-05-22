@@ -358,9 +358,9 @@ void CacheUnit::push(int port, Packet *p)
                         BloomFilter ebf(EBFSIZE*8) ;
                         BloomFilter ibf(IBFSIZE*8) ;
                         BABitvector to_sub_FID(FID_LEN*8) ;
-                        memcpy(ebf.data._data, p->data()+14+FID_LEN+sizeof(type)+index, EBFSIZE) ;
-                        memcpy(ibf.data._data, p->data()+14+FID_LEN+sizeof(type)+index+IBFSIZE, IBFSIZE) ;
-                        memcpy(to_sub_FID._data, p->data()+14+FID_LEN+sizeof(type)+index+IBFSIZE+EBFSIZE, FID_LEN) ;
+                        memcpy(ebf.data._data, p->data()+14+FID_LEN+sizeof(type)+sizeof(numberOfIDs)+index, EBFSIZE) ;
+                        memcpy(ibf.data._data, p->data()+14+FID_LEN+sizeof(type)+sizeof(numberOfIDs)+index+IBFSIZE, IBFSIZE) ;
+                        memcpy(to_sub_FID._data, p->data()+14+FID_LEN+sizeof(type)+sizeof(numberOfIDs)+index+IBFSIZE+EBFSIZE, FID_LEN) ;
 
                         Vector<String> infoIDs ;
                         for(Vector<String>::iterator iter = (*cache_iter)->IIDs.begin() ; iter != (*cache_iter)->IIDs.end() ; iter++)

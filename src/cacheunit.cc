@@ -383,7 +383,7 @@ void CacheUnit::push(int port, Packet *p)
                             if(ebf != ibf)
                             {
                                 WritablePacket* packet = p->uniqueify() ;
-                                memcpy(packet->data()+14+FID_LEN+sizeof(type)+index, ebf.data._data, EBFSIZE) ;
+                                memcpy(packet->data()+14+FID_LEN+sizeof(type)+sizeof(numberOfIDs)+index, ebf.data._data, EBFSIZE) ;
                                 output(5).push(packet) ;
                             }
                             return ;

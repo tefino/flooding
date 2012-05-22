@@ -1037,7 +1037,7 @@ unsigned int LocalRV::unsubscribe_scope(RemoteHost *_subscriber, String &ID, Str
                         for (ScopeSetIter fathersc_it = (*pub_it)._iipointer->fatherScopes.begin(); fathersc_it != (*pub_it)._iipointer->fatherScopes.end(); fathersc_it++) {
                             (*fathersc_it)._scpointer->getSubscribers(subscribers);
                         }
-                        rendezvous((*pub_it)._iipointer, subscribers);
+                        //rendezvous((*pub_it)._iipointer, subscribers);
                     }
                     /*do not try to delete if there are subscopes or InformationItems under the scope*/
                     if ((sc->childrenScopes.size() == 0) && (sc->informationitems.size() == 0)) {
@@ -1118,7 +1118,7 @@ unsigned int LocalRV::unsubscribe_scope(RemoteHost *_subscriber, String &ID, Str
                         for (fathersc_it = (*pub_it)._iipointer->fatherScopes.begin(); fathersc_it != (*pub_it)._iipointer->fatherScopes.end(); fathersc_it++) {
                             (*fathersc_it)._scpointer->getSubscribers(subscribers);
                         }
-                        rendezvous(pub_it.get()->_iipointer, subscribers);
+                        //rendezvous(pub_it.get()->_iipointer, subscribers);
                     }
                     /*do not try to delete after unsubscribing if there are subscopes or informationitems under the scope*/
                     if ((sc->childrenScopes.size() == 0) && (sc->informationitems.size() == 0)) {

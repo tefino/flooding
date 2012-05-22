@@ -344,7 +344,6 @@ void CacheUnit::push(int port, Packet *p)
                         return ;
                     }
                 }
-                memcpy(packet->data()+14+FID_LEN+sizeof(numberOfIDs)+index+FID_LEN, &hop_count, sizeof(hop_count)) ;
                 packet->set_anno_u32(0, (uint32_t)(IBFSIZE+index+sizeof(numberOfIDs)+sizeof(type)+FID_LEN+14)) ;
                 output(4).push(packet) ;
                 break ;

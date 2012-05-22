@@ -264,7 +264,7 @@ void TMIgraph::calculateFID(string &source, string &destination, Bitvector &resu
         Bitvector *lid = (*edge_LID.find(eid)).second;
         (resultFID) = (resultFID) | (*lid);
     }
-    numberOfHops = igraph_vector_size(temp_v);
+    numberOfHops = igraph_vector_size(temp_v)-1;
 
     /*now for the destination "or" the internal linkID*/
     Bitvector *ilid = (*nodeID_iLID.find(destination)).second;

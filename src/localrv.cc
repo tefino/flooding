@@ -1493,7 +1493,7 @@ void LocalRV::kanycast_askTMforNotifySub(unsigned char request_type, StringSet& 
     memcpy(p->data() + sizeof (typeForAPI) + sizeof (IDLenForAPI) + gc->nodeTMScope.length() +\
             sizeof (strategyAPI) + FID_LEN + sizeof (request_type) + sizeof (strategy) +\
             sizeof (no_subscribers) + subscriber_index + sizeof (no_sids) + sids_index+\
-            sizeof(no_iids)+iids_index*PURSUIT_ID_LEN, &noofpub, sizeof(noofpub)) ;
+            sizeof(no_iids)+iids_index, &noofpub, sizeof(noofpub)) ;
     p->set_anno_u32(0, RV_ELEMENT);
     output(0).push(p);
 }

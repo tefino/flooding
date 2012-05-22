@@ -1588,6 +1588,7 @@ void LocalProxy::handleScopeProbingMessage(Vector<String> IDs, Packet* p)
                 
                 if(tempibf == strfid_ibf.default_value())
                 {//if this path hasn't be choosen before, then add the iid to the empty bf
+                    tempibf.resize(IBFSIZE*8) ;
                     tempibf.zero() ;
                     tempibf.add2bf(iid_iter->_strData) ;
                 }

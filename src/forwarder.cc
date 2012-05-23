@@ -157,7 +157,7 @@ void Forwarder::push(int in_port, Packet *p) {
     bool pushLocally = false;
     click_ip *ip;
     click_udp *udp;
-    if (in_port == 0 || in_port == 2 || in_port == 4 || in_port == 5 || in_port == 6) {
+    if (in_port == 0 || in_port == 2 || in_port == 4 || in_port == 5) {
         /*0 for local packet, 2 for probing message , 4 for subinfo message, 5 for data push*/
         memcpy(FID._data, p->data(), FID_LEN);
         //Check all entries in my forwarding table and forward appropriately
@@ -253,6 +253,43 @@ void Forwarder::push(int in_port, Packet *p) {
                 unsigned csum = click_in_cksum((unsigned char *) udp, len);
                 udp->uh_sum = click_in_cksum_pseudohdr(csum, ip, len);
                 output(fe->port).push(newPacket);
+            }
+            counter++;
+        }
+    }else if( in_port == 6)
+    {
+        for (int i = 0; i < fwTable.size(); i++) {
+            fe = fwTable[i];
+            out_links.push_back(fe);
+        }
+        if (out_links.size() == 0) {
+            /*I can get here when an app or a click element did publish_data with a specific FID
+             *Note that I never check if I can push back the packet above if it matches my iLID
+             * the upper elements should check before pushing*/
+            p->kill();
+        }
+        for (out_links_it = out_links.begin(); out_links_it != out_links.end(); out_links_it++) {
+            if (counter == out_links.size()) {
+                payload = p->uniqueify();
+            } else {
+                payload = p->clone()->uniqueify();
+            }
+            fe = *out_links_it;
+            if (gc->use_mac) {
+                newPacket = payload->push_mac_header(14);
+                /*prepare the mac header*/
+                /*destination MAC*/
+                memcpy(newPacket->data(), fe->dst->data(), MAC_LEN);
+                /*source MAC*/
+                memcpy(newPacket->data() + MAC_LEN, fe->src->data(), MAC_LEN);
+                click_chatter("fw: sending out a kanycast message") ;
+                memcpy(newPacket->data() + MAC_LEN + MAC_LEN, &kanycast_type, 2) ;
+                /*push the packet to the appropriate ToDevice Element*/
+                output(fe->port).push(newPacket);
+            }
+            else
+            {
+                click_chatter("only support mac") ;
             }
             counter++;
         }
@@ -384,30 +421,60 @@ void Forwarder::push(int in_port, Packet *p) {
         }
     }else if(in_port==8)
     {
+        unsigned char numberOfIDs ;
+        unsigned char IDLength /*in fragments of PURSUIT_ID_LEN each*/;
+        int index = 0 ;
         click_chatter("fw: receive a flooding request") ;
-        if (gc->use_mac) {
-            memcpy(FID._data, p->data() + 14, FID_LEN);
-        } else {
-            memcpy(FID._data, p->data() + 28, FID_LEN);
+
+
+        memcpy(&numberOfIDs, p->data()+14+FID_LEN+sizeof(unsigned char), sizeof(numberOfIDs)) ;
+        for (int i = 0; i < (int) numberOfIDs; i++) {
+            IDLength = *(p->data()+14+FID_LEN+sizeof(unsigned char)+sizeof(numberOfIDs)+index);
+            index = index + sizeof (IDLength) + IDLength * PURSUIT_ID_LEN;
         }
-        BABitvector testFID(FID);
+
         BABitvector reverse_FID(FID_LEN*8) ;//our proposal the reverse FID, from sub to pub
         EtherAddress reverse_dst ;//our proposal reverse link source
         EtherAddress reverse_src ;//our proposal reverse link destination
         uint32_t offset = 0 ;//our proposal the offset to reverse FID in the probing message
 
         //get the reverse src and dst
-        offset = *(p->anno_u32()) ;
+        offset = 14+FID_LEN+sizeof(unsigned char)+sizeof(numberOfIDs)+index+IBFSIZE+EBFSIZE ;
         memcpy(reverse_src.data(), p->data(), MAC_LEN) ;
         memcpy(reverse_dst.data(), p->data()+MAC_LEN, MAC_LEN) ;
         memcpy(reverse_FID._data, p->data()+offset, FID_LEN) ;
+        for (int i = 0; i < fwTable.size(); i++)
+        {
+            fe = fwTable[i];
+            if(((*fe->src) == reverse_src) && ((*fe->dst) == reverse_dst))
+            {
+                reverse_FID |= (*fe->LID) ;
+                break ;
+            }
+        }
+        memcpy(payload->data()+offset, reverse_FID._data, FID_LEN) ;
+        payload = p->uniqueify() ;
+        output(5).push(payload) ;
+    }else if(in_port == 9)
+    {
+        if (gc->use_mac) {
+            memcpy(FID._data, p->data() + 14, FID_LEN);
+        } else {
+            memcpy(FID._data, p->data() + 28, FID_LEN);
+        }
+        BABitvector testFID(FID);
         testFID.negate();
+        EtherAddress reverse_dst ;//our proposal reverse link source
+        EtherAddress reverse_src ;//our proposal reverse link destination
+
+        memcpy(reverse_src.data(), p->data(), MAC_LEN) ;
+        memcpy(reverse_dst.data(), p->data()+MAC_LEN, MAC_LEN) ;
         if (!testFID.zero()) {
             /*Check all entries in my forwarding table and forward appropriately*/
             for (int i = 0; i < fwTable.size(); i++) {
+                fe = fwTable[i];
                 if(((*fe->src) == reverse_src) && ((*fe->dst) == reverse_dst))
                 {
-                    reverse_FID |= (*fe->LID) ;
                     continue ;
                 }
                 out_links.push_back(fe);
@@ -416,7 +483,7 @@ void Forwarder::push(int in_port, Packet *p) {
             /*all bits were 1 - probably from a link_broadcast strategy--do not forward*/
         }
         /*check if the packet must be pushed locally*/
-        andVector = FID & gc->iLID;/*this is how to check wether the packet is destined to the local node*/
+        andVector = FID  & gc->iLID;/*this is how to check wether the packet is destined to the local node*/
         if (andVector == gc->iLID) {
             pushLocally = true;
         }
@@ -431,9 +498,6 @@ void Forwarder::push(int in_port, Packet *p) {
                 }
                 fe = *out_links_it;
                 if (gc->use_mac) {
-                    /*prepare the mac header*/
-                    /*destination MAC*/
-                    memcpy(payload->data()+offset, reverse_FID._data, FID_LEN) ;
                     memcpy(payload->data(), fe->dst->data(), MAC_LEN);
                     /*source MAC*/
                     memcpy(payload->data() + MAC_LEN, fe->src->data(), MAC_LEN);
@@ -444,14 +508,13 @@ void Forwarder::push(int in_port, Packet *p) {
                 {
                     click_chatter("only support mac") ;
                 }
+                counter++ ;
             }
         }
         if (pushLocally) {
             if (gc->use_mac) {
                 p->pull(14);
-                payload = p->uniqueify();
-                memcpy(payload->data()+offset-14, reverse_FID._data, FID_LEN) ;
-                output(4).push(payload);
+                output(4).push(p);
             }
         }
         if ((out_links.size() == 0) && (!pushLocally)) {

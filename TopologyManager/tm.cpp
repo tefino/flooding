@@ -252,14 +252,13 @@ void handleRequest(char *request, int request_len) {
             int ids_index = sizeof (request_type) + sizeof (strategy) +sizeof (no_publishers) + no_publishers * PURSUIT_ID_LEN+\
             sizeof (no_subscribers) + no_subscribers * PURSUIT_ID_LEN;
             char *response = (char *) malloc(response_size);
-            string response_id = resp_bin_prefix_id + nodeID;
+            string response_id = resp_bin_prefix_id + subnodeid;
             memcpy(response, &request_type, sizeof (request_type));
             memcpy(response + sizeof (request_type), request + ids_index, request_len - ids_index);
             memcpy(response + sizeof (request_type)+request_len - ids_index, iLIDs._data, FID_LEN) ;//internal LID
 
             //cout << "PUBLISHING NOTIFICATION ABOUT NEW OR DELETED SCOPE to node " << nodeID << " using FID " << FID_to_subscriber->to_string() << endl;
             ba->publish_data(response_id, IMPLICIT_RENDEZVOUS, FID_to_subscriber->_data, FID_LEN, response, response_size);
-            idx += PURSUIT_ID_LEN;
             delete FID_to_subscriber;
             free(response);
         }

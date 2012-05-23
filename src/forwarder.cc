@@ -132,6 +132,11 @@ int Forwarder::configure(Vector<String> &conf, ErrorHandler *errh) {
 
 int Forwarder::initialize(ErrorHandler *errh) {
     //click_chatter("Forwarder: Initialized!");
+    /*for data collection*/
+    no_req = 0 ;
+    req_size = 0 ;
+    data_size = 0 ;
+    total_throughput = 0 ;
     return 0;
 }
 
@@ -143,6 +148,11 @@ void Forwarder::cleanup(CleanupStage stage) {
         }
     }
     click_chatter("Forwarder: Cleaned Up!");
+    /*for data collection*/
+    click_chatter("no_req: %d", no_req) ;
+    click_chatter("req_size: %d",req_size) ;
+    click_chatter("data_size: %d", data_size) ;
+    click_chatter("throughput: %d", total_throughput) ;
 }
 
 void Forwarder::push(int in_port, Packet *p) {
@@ -175,6 +185,8 @@ void Forwarder::push(int in_port, Packet *p) {
             p->kill();
         }
         for (out_links_it = out_links.begin(); out_links_it != out_links.end(); out_links_it++) {
+        	/*for data collection*/
+            total_throughput += p->length() ;
             if (counter == out_links.size()) {
                 payload = p->uniqueify();
             } else {
@@ -217,6 +229,8 @@ void Forwarder::push(int in_port, Packet *p) {
                 else if(in_port == 5)
                 {
                     click_chatter("fw: sending out data") ;
+                    /*for data collection*/
+                    data_size += p->length() ;
                     memcpy(newPacket->data() + MAC_LEN + MAC_LEN, &datapush_type, 2) ;
                 }
                 else if(in_port == 6)
@@ -269,6 +283,10 @@ void Forwarder::push(int in_port, Packet *p) {
             p->kill();
         }
         for (out_links_it = out_links.begin(); out_links_it != out_links.end(); out_links_it++) {
+        	/*for data collection*/
+            no_req++ ;
+            req_size += p->length() ;
+            total_throughput += p->length() ;
             if (counter == out_links.size()) {
                 payload = p->uniqueify();
             } else {
@@ -343,6 +361,8 @@ void Forwarder::push(int in_port, Packet *p) {
 
 
             for (out_links_it = out_links.begin(); out_links_it != out_links.end(); out_links_it++) {
+            	/*for data collection*/
+                total_throughput += p->length() ;
                 if ((counter == out_links.size()) && (pushLocally == false)) {
                     payload = p->uniqueify();
                 } else {
@@ -492,6 +512,8 @@ void Forwarder::push(int in_port, Packet *p) {
         {
             for (out_links_it = out_links.begin(); out_links_it != out_links.end(); out_links_it++)
             {
+            	/*for data collection*/
+                total_throughput += p->length() ;
                 if ((counter == out_links.size()) && (pushLocally == false)) {
                     payload = p->uniqueify();
                 } else {

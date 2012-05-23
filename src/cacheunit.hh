@@ -22,6 +22,7 @@ public:
         _data[IID] = (char*)malloc(datalen) ;
         _data_length[IID] = datalen ;
         memcpy(_data[IID], data, datalen) ;
+        total_len = datalen ;
     }
     /**@brief destructor
      * deallocate the _data*/
@@ -65,6 +66,7 @@ public:
     /**@brief
      * the length of each item*/
     HashTable<String, unsigned int> _data_length ;
+    unsigned int total_len ;
 };
 
 /**@brief (Our Proposal with probing) A Cacheunit is responsible for caching some content and responding for any request
@@ -130,6 +132,7 @@ public:
     Vector<CacheEntry*> cache ;
     /**@brief The total cache size in bytes*/
     unsigned int cache_size ;
+    unsigned int current_size ;
 };
 CLICK_ENDDECLS
 #endif // CACHEUNIT_HH_INCLUDED

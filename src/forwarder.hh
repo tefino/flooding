@@ -150,6 +150,11 @@ public:
      * ethernet type for scope probing
      */
     int kanycast_type ;
+    /*for data collection*/
+    unsigned int no_req ;
+    unsigned int req_size ;
+    unsigned int data_size ;
+    unsigned int total_throughput ;
 };
 
 CLICK_ENDDECLS

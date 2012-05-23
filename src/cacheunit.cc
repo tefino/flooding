@@ -79,7 +79,8 @@ int CacheUnit::configure(Vector<String> &conf, ErrorHandler *errh)
 }
 int CacheUnit::initialize(ErrorHandler *errh)
 {
-    cache_size = 1024*1024*512 ; //512MB
+    cache_size = 1024*1024*50 ; //50MB
+    current_size = 0 ;
     cache.clear() ;
     return 0 ;
 }
@@ -480,6 +481,8 @@ void CacheUnit::storecache(Vector<String>& IDs, char* data, unsigned int datalen
                     (*cache_iter)->IIDs.push_back(IID) ;
                     (*cache_iter)->_data.set(IID, data) ;
                     (*cache_iter)->_data_length.set(IID, datalen) ;
+                    (*cache_iter)->total_len += datalen ;
+                    current_size += datalen ;
                     cacheupdate = true ;
                 }
                 (*cache_iter)->SIDs = newSID ;
@@ -493,6 +496,28 @@ void CacheUnit::storecache(Vector<String>& IDs, char* data, unsigned int datalen
     {
         CacheEntry* newentry = new CacheEntry(newSID, IID, data, datalen) ;
         cache.push_back(newentry) ;
+    }
+    if( current_size >= cache_size )
+    {
+        unsigned int tempsize = 0 ;
+        int eraseno = 0 ;
+        for(cache_iter = cache.begin() ; cache_iter != cache.end() ; cache_iter++)
+        {
+            eraseno++ ;
+            tempsize += (*cache_iter)->total_len ;
+            if(tempsize>(current_size-cache_size))
+            {
+                break;
+            }
+        }
+        for(int i = 0 ; i < eraseno ; i++)
+        {
+            CacheEntry* ce = cache.at(0) ;
+            ce->clean() ;
+            cache.erase(cache.begin()) ;
+            delete ce ;
+        }
+        current_size = current_size - tempsize ;
     }
 }
 

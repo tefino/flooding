@@ -452,8 +452,9 @@ void Forwarder::push(int in_port, Packet *p) {
                 break ;
             }
         }
-        memcpy(payload->data()+offset, reverse_FID._data, FID_LEN) ;
         payload = p->uniqueify() ;
+        memcpy(payload->data()+offset, reverse_FID._data, FID_LEN) ;
+        
         output(5).push(payload) ;
     }else if(in_port == 9)
     {

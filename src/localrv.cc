@@ -770,8 +770,8 @@ unsigned int LocalRV::subscribe_root_scope(RemoteHost *_subscriber, String &ID, 
                 //Since it's root scope, there aren't any father scopes
                 SIDs.find_insert(ID) ;
                 //only notufy the newly added subscriber
-                kanycast_notifySubscribers(INFO_PUBLISHED, IIDs, strategy, subscribers, SIDs, publishers.size()) ;
-                kanycast_rendezvous(publishers, subscribers, SIDs, strategy) ;
+                kanycast_notifySubscribers(INFO_PUBLISHED, IIDs, strategy, publishers, subscribers, SIDs, publishers.size()) ;
+ //               kanycast_rendezvous(publishers, subscribers, SIDs, strategy) ;
                 ret = SUCCESS;
 
 
@@ -891,8 +891,8 @@ unsigned int LocalRV::subscribe_inner_scope(RemoteHost *_subscriber, String &ID,
                         //get all the SIDs that represent this scope
                         sc->getIDs(SIDs) ;
                         SIDs.find_insert(fullID) ;
-                        kanycast_notifySubscribers(INFO_PUBLISHED, IIDs, strategy, subscribers, SIDs, publishers.size()) ;
-                        kanycast_rendezvous(publishers, subscribers, SIDs, strategy) ;
+                        kanycast_notifySubscribers((unsigned char)INFO_PUBLISHED, IIDs, strategy, publishers, subscribers, SIDs, (unsigned int)publishers.size()) ;
+ //                       kanycast_rendezvous(publishers, subscribers, SIDs, strategy) ;
                         ret = SUCCESS;
 
 //                        /*add the scope to the subscriber's set*/
@@ -1418,7 +1418,7 @@ void LocalRV::requestTMAssistanceForNotifyingSubscribers(unsigned char request_t
 }
 
 void LocalRV::kanycast_askTMforNotifySub(unsigned char request_type, StringSet& IIDs, unsigned char strategy,\
-                                         RemoteHostSet& _subscribers, StringSet& SIDs, unsigned int noofpub)
+                                         RemoteHostSet& _publishers, RemoteHostSet& _subscribers, StringSet& SIDs, unsigned int noofpub)
 {
     /*Publish a request to the TM*/
     int packet_len;
@@ -1429,8 +1429,10 @@ void LocalRV::kanycast_askTMforNotifySub(unsigned char request_type, StringSet& 
     unsigned char strategyAPI = IMPLICIT_RENDEZVOUS;
     /****************************/
     unsigned char no_subscribers = _subscribers.size();
+    unsigned char no_publishers = _publishers.size() ;
     int subscriber_index = 0;
-    unsigned char no_sids = SIDs.size();
+    int publisher_index = 0 ;
+    unsigned char no_sids = SIDs.size() ;
     unsigned char SIDs_total_bytes = 0;
     unsigned char no_iids = IIDs.size() ;
     int sids_index = 0;
@@ -1440,59 +1442,90 @@ void LocalRV::kanycast_askTMforNotifySub(unsigned char request_type, StringSet& 
     }
     /*allocate the packet*/
     packet_len = /*For the blackadder API*/ sizeof (typeForAPI) + sizeof (IDLenForAPI) + gc->nodeTMScope.length() + sizeof (strategyAPI) + FID_LEN/*END OF API*/\
-    /*PAYLOAD*/ + sizeof (request_type) + sizeof (strategy) + sizeof (no_subscribers) /*sizeof(numberOfSubs)*/ +\
-    _subscribers.size() * NODEID_LEN + sizeof (no_sids) /*sizeof(numberOfpathIDs)*/ + SIDs.size() * sizeof (unsigned char) +SIDs_total_bytes+\
-    /*kanycast*/sizeof(no_iids)/*#ofiids*/+no_iids*PURSUIT_ID_LEN/*all the iids*/+sizeof(noofpub)/*#ofpub*/;
+    /*PAYLOAD*/ + sizeof (request_type) + sizeof (strategy) +sizeof(no_publishers)+no_publishers*NODEID_LEN+\
+    sizeof (no_subscribers) /*sizeof(numberOfSubs)*/ +_subscribers.size() * NODEID_LEN +\
+    sizeof (no_sids) /*sizeof(numberOfpathIDs)*/ + SIDs.size() * sizeof (unsigned char) +SIDs_total_bytes+\
+    /*kanycast*/sizeof(no_iids)/*#ofiids*/+no_iids*PURSUIT_ID_LEN/*all the iids*/+sizeof(noofpub)/*#ofpub*/ ;
     p = Packet::make(50, NULL, packet_len, 0);
     /*For the API*/
     memcpy(p->data(), &typeForAPI, sizeof (typeForAPI));
     memcpy(p->data() + sizeof (typeForAPI), &IDLenForAPI, sizeof (IDLenForAPI));
-    memcpy(p->data() + sizeof (typeForAPI) + sizeof (IDLenForAPI), gc->nodeTMScope.c_str(), gc->nodeTMScope.length());
-    memcpy(p->data() + sizeof (typeForAPI) + sizeof (IDLenForAPI) + gc->nodeTMScope.length(), &strategyAPI, sizeof (strategyAPI));
-    memcpy(p->data() + sizeof (typeForAPI) + sizeof (IDLenForAPI) + gc->nodeTMScope.length() + sizeof (strategyAPI), gc->TMFID._data, FID_LEN);
+    memcpy(p->data() + sizeof (typeForAPI) + sizeof (IDLenForAPI), gc->nodeTMScope.c_str(),\
+           gc->nodeTMScope.length());
+    memcpy(p->data() + sizeof (typeForAPI) + sizeof (IDLenForAPI) + gc->nodeTMScope.length(),\
+           &strategyAPI, sizeof (strategyAPI));
+    memcpy(p->data() + sizeof (typeForAPI) + sizeof (IDLenForAPI) + gc->nodeTMScope.length() +\
+           sizeof (strategyAPI), gc->TMFID._data, FID_LEN);
     /*Put the payload*/
-    memcpy(p->data() + sizeof (typeForAPI) + sizeof (IDLenForAPI) + gc->nodeTMScope.length() + sizeof (strategyAPI) + FID_LEN, &request_type, sizeof (request_type));
+    memcpy(p->data() + sizeof (typeForAPI) + sizeof (IDLenForAPI) + gc->nodeTMScope.length() +\
+           sizeof (strategyAPI) + FID_LEN, &request_type, sizeof (request_type));
     /*put the dissemination strategy of scope*/
-    memcpy(p->data() + sizeof (typeForAPI) + sizeof (IDLenForAPI) + gc->nodeTMScope.length() + sizeof (strategyAPI) + FID_LEN + sizeof (request_type), &strategy, sizeof (strategy));
+    memcpy(p->data() + sizeof (typeForAPI) + sizeof (IDLenForAPI) + gc->nodeTMScope.length() +\
+           sizeof (strategyAPI) + FID_LEN + sizeof (request_type), &strategy, sizeof (strategy));
+
+    //put the pub for on path cache
+    memcpy(p->data() + sizeof (typeForAPI) + sizeof (IDLenForAPI) + gc->nodeTMScope.length() +\
+           sizeof (strategyAPI) + FID_LEN + sizeof (request_type)+sizeof (strategy),\
+           &no_publishers, sizeof(no_publishers));
+    for (RemoteHostSetIter iter = _publishers.begin(); iter != _publishers.end(); iter++) {
+        memcpy(p->data() + sizeof (typeForAPI) + sizeof (IDLenForAPI) + gc->nodeTMScope.length() +\
+           sizeof (strategyAPI) + FID_LEN + sizeof (request_type)+sizeof (strategy)+\
+            sizeof(no_publishers)+ publisher_index, (*iter)._rhpointer->remoteHostID.c_str(),\
+            (*iter)._rhpointer->remoteHostID.length());
+        publisher_index += (*iter)._rhpointer->remoteHostID.length();
+    }
+
     /*put the subscriber IDs*/
-    memcpy(p->data() + sizeof (typeForAPI) + sizeof (IDLenForAPI) + gc->nodeTMScope.length() + sizeof (strategyAPI) + FID_LEN + sizeof (request_type) + sizeof (strategy), &no_subscribers, sizeof (no_subscribers));
+    memcpy(p->data() + sizeof (typeForAPI) + sizeof (IDLenForAPI) + gc->nodeTMScope.length() +\
+           sizeof (strategyAPI) + FID_LEN + sizeof (request_type) + sizeof (strategy)+\
+           sizeof(no_publishers)+ publisher_index, &no_subscribers, sizeof (no_subscribers));
+
     for (RemoteHostSetIter iter = _subscribers.begin(); iter != _subscribers.end(); iter++) {
-        memcpy(p->data() + sizeof (typeForAPI) + sizeof (IDLenForAPI) + gc->nodeTMScope.length() + sizeof (strategyAPI) + FID_LEN + sizeof (request_type) + sizeof (strategy) + sizeof (no_subscribers) + subscriber_index, (*iter)._rhpointer->remoteHostID.c_str(), (*iter)._rhpointer->remoteHostID.length());
+        memcpy(p->data() + sizeof (typeForAPI) + sizeof (IDLenForAPI) + gc->nodeTMScope.length() +\
+               sizeof (strategyAPI) + FID_LEN + sizeof (request_type) + sizeof (strategy) +\
+               sizeof(no_publishers)+ publisher_index+sizeof (no_subscribers) + subscriber_index,\
+               (*iter)._rhpointer->remoteHostID.c_str(), (*iter)._rhpointer->remoteHostID.length());
         subscriber_index += (*iter)._rhpointer->remoteHostID.length();
     }
     memcpy(p->data() + sizeof (typeForAPI) + sizeof (IDLenForAPI) + gc->nodeTMScope.length() +\
            sizeof (strategyAPI) + FID_LEN + sizeof (request_type) + sizeof (strategy) +\
-           sizeof (no_subscribers) + subscriber_index, &no_sids, sizeof (no_sids));
+           sizeof(no_publishers)+ publisher_index+sizeof (no_subscribers) + subscriber_index,\
+           &no_sids, sizeof (no_sids));
     /*put the pathIDs of the information item*/
     for (StringSetIter iter = SIDs.begin(); iter != SIDs.end(); iter++) {
         unsigned char IDLength = (unsigned char) (*iter)._strData.length() / PURSUIT_ID_LEN;
         memcpy(p->data() + sizeof (typeForAPI) + sizeof (IDLenForAPI) + gc->nodeTMScope.length() +\
                sizeof (strategyAPI) + FID_LEN + sizeof (request_type) + sizeof (strategy) +\
-               sizeof (no_subscribers) + subscriber_index + sizeof (no_sids) + sids_index, &IDLength, sizeof (IDLength));
+               sizeof(no_publishers)+ publisher_index+sizeof (no_subscribers) + subscriber_index +\
+               sizeof (no_sids) + sids_index, &IDLength, sizeof (IDLength));
         memcpy(p->data() + sizeof (typeForAPI) + sizeof (IDLenForAPI) + gc->nodeTMScope.length() +\
                sizeof (strategyAPI) + FID_LEN + sizeof (request_type) + sizeof (strategy) +\
-               sizeof (no_subscribers) + subscriber_index + sizeof (no_sids) + sids_index +\
-               sizeof (IDLength), (*iter)._strData.c_str(), (*iter)._strData.length());
+               sizeof(no_publishers)+ publisher_index+sizeof (no_subscribers) + subscriber_index +\
+               sizeof (no_sids) + sids_index +sizeof (IDLength), (*iter)._strData.c_str(),\
+               (*iter)._strData.length());
         sids_index += sizeof (IDLength) + (*iter)._strData.length();
     }
     /*kanycast*/
     //add # of information id
     memcpy(p->data() + sizeof (typeForAPI) + sizeof (IDLenForAPI) + gc->nodeTMScope.length() +\
             sizeof (strategyAPI) + FID_LEN + sizeof (request_type) + sizeof (strategy) +\
-            sizeof (no_subscribers) + subscriber_index + sizeof (no_sids) + sids_index, &no_iids, sizeof(no_iids)) ;
+            sizeof(no_publishers)+ publisher_index+sizeof (no_subscribers) + subscriber_index +\
+           sizeof (no_sids) + sids_index, &no_iids, sizeof(no_iids)) ;
     //add all the information id
     for(StringSetIter iter = IIDs.begin() ; iter != IIDs.end() ; iter++)
     {
         memcpy(p->data() + sizeof (typeForAPI) + sizeof (IDLenForAPI) + gc->nodeTMScope.length() +\
             sizeof (strategyAPI) + FID_LEN + sizeof (request_type) + sizeof (strategy) +\
-            sizeof (no_subscribers) + subscriber_index + sizeof (no_sids) + sids_index+sizeof(no_iids)+iids_index,\
+            sizeof(no_publishers)+ publisher_index+sizeof (no_subscribers) + subscriber_index +\
+            sizeof (no_sids) + sids_index+sizeof(no_iids)+iids_index,\
             (*iter)._strData.c_str(),(*iter)._strData.length()) ;
         iids_index += PURSUIT_ID_LEN ;
     }
     //add # of publishers
     memcpy(p->data() + sizeof (typeForAPI) + sizeof (IDLenForAPI) + gc->nodeTMScope.length() +\
             sizeof (strategyAPI) + FID_LEN + sizeof (request_type) + sizeof (strategy) +\
-            sizeof (no_subscribers) + subscriber_index + sizeof (no_sids) + sids_index+\
+            sizeof(no_publishers)+ publisher_index+sizeof (no_subscribers) + subscriber_index +\
+            sizeof (no_sids) + sids_index+\
             sizeof(no_iids)+iids_index, &noofpub, sizeof(noofpub)) ;
     p->set_anno_u32(0, RV_ELEMENT);
     output(0).push(p);
@@ -1591,12 +1624,13 @@ void LocalRV::notifySubscribers(unsigned char type, StringSet &IDs, unsigned cha
     }
 }
 
-void LocalRV::kanycast_notifySubscribers(unsigned char type, StringSet& IIDs, unsigned char strategy, RemoteHostSet& sub, StringSet& SIDs, unsigned int noofpub)
+void LocalRV::kanycast_notifySubscribers(unsigned char type, StringSet& IIDs, unsigned char strategy,\
+                                         RemoteHostSet& pub, RemoteHostSet& sub, StringSet& SIDs, unsigned int noofpub)
 {
     if(strategy == DOMAIN_LOCAL)
     {
         if(sub.size() > 0)
-            kanycast_askTMforNotifySub(type, IIDs, strategy, sub, SIDs, noofpub) ;
+            kanycast_askTMforNotifySub(type, IIDs, strategy, pub, sub, SIDs, noofpub) ;
     }
     else
     {

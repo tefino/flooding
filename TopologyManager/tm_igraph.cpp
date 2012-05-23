@@ -275,3 +275,26 @@ void TMIgraph::calculateFID(string &source, string &destination, Bitvector &resu
     igraph_vector_ptr_destroy_all(&res);
     igraph_vs_destroy(&vs);
 }
+
+void TMIgraph::calculateFID(string &source, set<string> &dest, Bitvector &result, string &bestnode) {
+    set<string>::iterator dest_it;
+    Bitvector resultFID(FID_LEN * 8);
+    Bitvector bestFID(FID_LEN * 8);
+    unsigned int numberOfHops = 0;
+    unsigned int minimumNumberOfHops = UINT_MAX;
+    for (dest_it = dest.begin(); dest_it != dest.end(); dest_it++) {
+        /*for all dest calculate the number of hops from all source (not very optimized...don't you think?)*/
+
+        resultFID.clear();
+        string str2 = (*dest_it);
+        calculateFID(source, str2, resultFID, numberOfHops);
+        if (minimumNumberOfHops > numberOfHops) {
+            minimumNumberOfHops = numberOfHops;
+            bestFID = resultFID;
+            bestnode = str2 ;
+        }
+    }
+    result = bestFID ;
+}
+
+

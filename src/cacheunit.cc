@@ -372,6 +372,7 @@ void CacheUnit::push(int port, Packet *p)
                         }
                         if(infoIDs.empty())
                         {
+                            p->set_anno_u32(0,(uint32_t)(14+FID_LEN+sizeof(type)+sizeof(numberOfIDs)+index+IBFSIZE+EBFSIZE)) ;
                             output(5).push(p) ;
                             return ;
                         }
@@ -383,12 +384,18 @@ void CacheUnit::push(int port, Packet *p)
                             {
                                 WritablePacket* packet = p->uniqueify() ;
                                 memcpy(packet->data()+14+FID_LEN+sizeof(type)+sizeof(numberOfIDs)+index, ebf.data._data, EBFSIZE) ;
+                                packet->set_anno_u32(0,(uint32_t)(14+FID_LEN+sizeof(type)+sizeof(numberOfIDs)+index+IBFSIZE+EBFSIZE)) ;
                                 output(5).push(packet) ;
+                            }
+                            else
+                            {
+                                p->kill() ;
                             }
                             return ;
                         }
                     }
                 }
+                p->set_anno_u32(0,(uint32_t)(14+FID_LEN+sizeof(type)+sizeof(numberOfIDs)+index+IBFSIZE+EBFSIZE)) ;
                 output(5).push(p) ;
             }
             default:

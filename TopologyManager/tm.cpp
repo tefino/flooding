@@ -203,11 +203,12 @@ void handleRequest(char *request, int request_len) {
                 free(response);
             }
         }
-    }else if ((request_type == SCOPE_PUBLISHED) || (request_type == SCOPE_UNPUBLISHED) || (request_type == INFO_PUBLISHED)) {
+    }else if ((request_type == SCOPE_PUBLISHED) || (request_type == SCOPE_UNPUBLISHED)) {
         /*this a request to notify subscribers about a new scope*/
         memcpy(&no_subscribers, request + sizeof (request_type) + sizeof (strategy), sizeof (no_subscribers));
         for (int i = 0; i < (int) no_subscribers; i++) {
-            nodeID = string(request + sizeof (request_type) + sizeof (strategy) + sizeof (no_subscribers) + idx, PURSUIT_ID_LEN);
+            nodeID = string(request + sizeof (request_type) + sizeof (strategy) + sizeof (no_subscribers) + idx,\
+                            PURSUIT_ID_LEN);
             Bitvector *FID_to_subscriber = tm_igraph.calculateFID(tm_igraph.nodeID, nodeID);
             int response_size = request_len - sizeof(strategy) - sizeof (no_subscribers) - no_subscribers * PURSUIT_ID_LEN + FID_LEN;
             int ids_index = sizeof (request_type) + sizeof (strategy) + sizeof (no_subscribers) + no_subscribers * PURSUIT_ID_LEN;
@@ -215,6 +216,47 @@ void handleRequest(char *request, int request_len) {
             string response_id = resp_bin_prefix_id + nodeID;
             memcpy(response, &request_type, sizeof (request_type));
             memcpy(response + sizeof (request_type), request + ids_index, request_len - ids_index);
+            //cout << "PUBLISHING NOTIFICATION ABOUT NEW OR DELETED SCOPE to node " << nodeID << " using FID " << FID_to_subscriber->to_string() << endl;
+            ba->publish_data(response_id, IMPLICIT_RENDEZVOUS, FID_to_subscriber->_data, FID_LEN, response, response_size);
+            idx += PURSUIT_ID_LEN;
+            delete FID_to_subscriber;
+            free(response);
+        }
+    }else if((request_type == INFO_PUBLISHED))
+    {
+        Bitvector iLIDs(FID_LEN*8) ;
+        memcpy(&no_publishers, request + sizeof (request_type) + sizeof (strategy), sizeof (no_publishers));
+        for (int i = 0; i < (int) no_publishers; i++) {
+            nodeID = string(request + sizeof (request_type) + sizeof (strategy) + sizeof (no_publishers) + idx,\
+                            PURSUIT_ID_LEN);
+            cout << nodeID << " ";
+            idx += PURSUIT_ID_LEN;
+            publishers.insert(nodeID);
+            iLIDs |= *(tm_igraph.nodeID_iLID[nodeID]) ;
+        }
+        memcpy(&no_subscribers, request + sizeof (request_type) + sizeof (strategy) + sizeof (no_publishers) + idx, sizeof (no_subscribers));
+        for (int i = 0; i < (int) no_subscribers; i++) {
+            nodeID = string(request + sizeof (request_type) + sizeof (strategy) + sizeof (no_publishers) +\
+                            sizeof (no_subscribers) + idx, PURSUIT_ID_LEN);
+            cout << nodeID << " ";
+            idx += PURSUIT_ID_LEN;
+            subscribers.insert(nodeID);
+        }
+        for (set<string>::iterator iter = subscribers.begin() ; iter != subscribers.end() ; iter++)
+        {
+            string subnodeid = *iter ;
+            Bitvector *FID_to_subscriber = tm_igraph.calculateFID(tm_igraph.nodeID, subnodeid);
+
+            int response_size = request_len-sizeof(strategy)-sizeof(no_publishers)-no_publishers*PURSUIT_ID_LEN-\
+            sizeof(no_subscribers)-no_subscribers * PURSUIT_ID_LEN+ FID_LEN;
+            int ids_index = sizeof (request_type) + sizeof (strategy) +sizeof (no_publishers) + no_publishers * PURSUIT_ID_LEN+\
+            sizeof (no_subscribers) + no_subscribers * PURSUIT_ID_LEN;
+            char *response = (char *) malloc(response_size);
+            string response_id = resp_bin_prefix_id + nodeID;
+            memcpy(response, &request_type, sizeof (request_type));
+            memcpy(response + sizeof (request_type), request + ids_index, request_len - ids_index);
+            memcpy(response + sizeof (request_type)+request_len - ids_index, iLIDs._data, FID_LEN) ;//internal LID
+
             //cout << "PUBLISHING NOTIFICATION ABOUT NEW OR DELETED SCOPE to node " << nodeID << " using FID " << FID_to_subscriber->to_string() << endl;
             ba->publish_data(response_id, IMPLICIT_RENDEZVOUS, FID_to_subscriber->_data, FID_LEN, response, response_size);
             idx += PURSUIT_ID_LEN;

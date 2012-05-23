@@ -15,7 +15,7 @@ dnl legally binding.
 AC_INIT(click-blackadder, 2.0.1)
 AC_SUBST(ac_configure_args)
 
-CLICKPACKAGENAME=blackadder_kanycast
+CLICKPACKAGENAME=blackadder_flooding
 AC_SUBST(CLICKPACKAGENAME)
 
 

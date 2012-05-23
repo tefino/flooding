@@ -377,7 +377,7 @@ bool LocalProxy::removeActivePublication(LocalHost *_publisher, String &fullID, 
 		            click_chatter("localProxy removeActivePublication: scope not published yet") ;
 		        }
 		    }
-            	
+
                 _publisher->activePublications.erase(fullID);
                 ap->publishers.erase(_publisher);
                 //click_chatter("LocalProxy: deleted publisher %s from Active Scope Publication %s", _publisher->publisherID.c_str(), fullID.quoted_hex().c_str());
@@ -649,6 +649,7 @@ void LocalProxy::handleRVNotification(Packet *p) {
             StringSet IIDs ;
             int noofpub ;
             int i ;
+            BABitvector pubiLIDs(FID_LEN*8) ;
             memcpy(&noofiids, p->data() + sizeof (type) + sizeof (numberOfIDs) + index, sizeof(noofiids)) ;
             for(i = 0 ; i < (int)noofiids ; i++)
             {
@@ -657,35 +658,38 @@ void LocalProxy::handleRVNotification(Packet *p) {
             }
             memcpy(&noofpub, p->data() + sizeof (type) + sizeof (numberOfIDs) +\
                                 index + sizeof(noofiids)+i*PURSUIT_ID_LEN, sizeof(noofpub)) ;
+            memcpy(pubiLIDs._data, p->data() + sizeof (type) + sizeof (numberOfIDs) +\
+                                index + sizeof(noofiids)+i*PURSUIT_ID_LEN+sizeof(noofpub), FID_LEN) ;
+            floodingReq(IDs, IIDs, pubiLIDs) ;
             //save iid to ativesub, notify subscriber
-            for(i = 0 ; i < (int) numberOfIDs ; i++)
-            {
-                ActiveSubscription *as;
-                LocalHostSetIter set_it;
-                as = activeSubscriptionIndex.get(IDs[i]);
-                if (as != activeSubscriptionIndex.default_value()) {
-                    if (as->isScope) {
-                        for (set_it = as->subscribers.begin(); set_it != as->subscribers.end(); set_it++) {
-                            //sendNotificationLocally(*set_it);
-
-                        }
-                        as->probing_received = true ;
-                        as->IIDs = IIDs ;
-                        as->noofiipub = noofpub ;
-                        for(Vector<String>::iterator iter = as->temp_probing_message.begin() ; iter !=\
-                            as->temp_probing_message.end() ; iter++)
-                        {
-                            WritablePacket* p ;
-                            p = Packet::make(iter->length()) ;
-                            memcpy(p->data(), iter->c_str(), iter->length()) ;
-                            Vector<String> tempid ;
-                            tempid.push_back(IDs[i]) ;
-                            handleScopeProbingMessage(tempid, p) ;
-                        }
-                        as->temp_probing_message.clear() ;
-                    }
-                }
-            }
+//            for(i = 0 ; i < (int) numberOfIDs ; i++)
+//            {
+//                ActiveSubscription *as;
+//                LocalHostSetIter set_it;
+//                as = activeSubscriptionIndex.get(IDs[i]);
+//                if (as != activeSubscriptionIndex.default_value()) {
+//                    if (as->isScope) {
+//                        for (set_it = as->subscribers.begin(); set_it != as->subscribers.end(); set_it++) {
+//                            sendNotificationLocally(*set_it);
+//
+//                        }
+//                        as->probing_received = true ;
+//                        as->IIDs = IIDs ;
+//                        as->noofiipub = noofpub ;
+//                        for(Vector<String>::iterator iter = as->temp_probing_message.begin() ; iter !=\
+//                            as->temp_probing_message.end() ; iter++)
+//                        {
+//                            WritablePacket* p ;
+//                            p = Packet::make(iter->length()) ;
+//                            memcpy(p->data(), iter->c_str(), iter->length()) ;
+//                            Vector<String> tempid ;
+//                            tempid.push_back(IDs[i]) ;
+//                            handleScopeProbingMessage(tempid, p) ;
+//                        }
+//                        as->temp_probing_message.clear() ;
+//                    }
+//                }
+//            }
             break ;
         }
         case SCOPE_PROBING:
@@ -1580,12 +1584,12 @@ void LocalProxy::handleScopeProbingMessage(Vector<String> IDs, Packet* p)
                 BloomFilter tempibf(IBFSIZE*8) ;//temp information bloom filter
                 BABitvector tempfid(FID_LEN*8) ;
                 String tempfidstr ;
-                
+
                 tempfid = as->iid_FID_map.get(iid_iter->_strData) ;
                 tempfidstr = String((const char*)(tempfid._data), FID_LEN) ;
                 tempibf = strfid_ibf.get(tempfidstr) ;
                 str_fid.set(tempfidstr, tempfid) ;
-                
+
                 if(tempibf == strfid_ibf.default_value())
                 {//if this path hasn't be choosen before, then add the iid to the empty bf
                     tempibf.resize(IBFSIZE*8) ;
@@ -1605,7 +1609,7 @@ void LocalProxy::handleScopeProbingMessage(Vector<String> IDs, Packet* p)
                 int packet_size = FID_LEN+sizeof(type)+index+sizeof(numberOfIDs)+EBFSIZE+IBFSIZE+FID_LEN ;
                 packet = Packet::make(packet_size) ;
 
-		memcpy(packet->data(), str_fid[strfid_ibf_iter->first]._data, FID_LEN) ;
+                memcpy(packet->data(), str_fid[strfid_ibf_iter->first]._data, FID_LEN) ;
                 memcpy(packet->data()+FID_LEN, &type, sizeof(type)) ;
                 memcpy(packet->data()+FID_LEN+sizeof(type), &numberOfIDs, sizeof(numberOfIDs)) ;
                 memcpy(packet->data()+FID_LEN+sizeof(type)+sizeof(numberOfIDs), p->data()+FID_LEN+sizeof(type)+sizeof(numberOfIDs), index) ;
@@ -1617,6 +1621,50 @@ void LocalProxy::handleScopeProbingMessage(Vector<String> IDs, Packet* p)
         }
     }
 }
+
+void LocalProxy::floodingReq(Vector<String> &SIDs, StringSet &IIDs, BABitvector iLIDs)
+{
+    unsigned char type = SUB_SCOPE_MESSAGE ;
+    unsigned char no_sid = SIDs.size() ;
+    unsigned char no_iid = IIDs.size() ;
+    unsigned char each_sid_len ;
+    unsigned int sid_len = 0 ;
+    int sid_index = 0 ;
+    for( int i = 0 ; i < (int)no_sid ; i++)
+    {
+        sid_len += SIDs[i].length() ;
+    }
+    int packet_len = FID_LEN+sizeof(type)+sizeof(no_sid)+no_sid*sizeof(each_sid_len)+sid_len+\
+                     EBFSIZE+IBFSIZE+FID_LEN ;
+    WritablePacket* packet ;
+    packet = Packet::make(packet_len) ;
+    BloomFilter ebf(EBFSIZE*8) ;
+    BloomFilter ibf(IBFSIZE*8) ;
+    for(StringSetIter iter = IIDs.begin() ; iter != IIDs.end() ; iter++)
+    {
+        String tempiid = iter->_strData ;
+        ibf.add2bf(tempiid) ;
+    }
+    memcpy(packet->data(), iLIDs._data, FID_LEN) ;
+    memcpy(packet->data()+FID_LEN, &type, sizeof(type)) ;
+    memcpy(packet->data()+FID_LEN+sizeof(type), &no_sid, sizeof(no_sid)) ;
+    for(int i = 0 ; i < (int) no_sid ; i++)
+    {
+        each_sid_len = SIDs[i].length()/PURSUIT_ID_LEN ;
+        memcpy(packet->data()+FID_LEN+sizeof(type)+sizeof(no_sid)+sid_index, &each_sid_len, sizeof(each_sid_len)) ;
+        memcpy(packet->data()+FID_LEN+sizeof(type)+sizeof(no_sid)+sid_index+sizeof(each_sid_len),\
+               SIDs[i].c_str(), SIDs[i].length()) ;
+        sid_index += sizeof(each_sid_len) + SIDs[i].length() ;
+    }
+    memcpy(packet->data()+FID_LEN+sizeof(type)+sizeof(no_sid)+sid_index, ebf.data._data, EBFSIZE) ;
+    memcpy(packet->data()+FID_LEN+sizeof(type)+sizeof(no_sid)+sid_index+EBFSIZE, ibf.data._data, IBFSIZE) ;
+    memcpy(packet->data()+FID_LEN+sizeof(type)+sizeof(no_sid)+sid_index+EBFSIZE+IBFSIZE,\
+           gc->iLID._data, FID_LEN) ;
+    output(6).push(packet) ;
+
+
+}
+
 
 void LocalProxy::notifyPubScopeInfoSub(Vector<String>& SIDs, Packet* p)
 {

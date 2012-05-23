@@ -256,7 +256,7 @@ void Forwarder::push(int in_port, Packet *p) {
             }
             counter++;
         }
-    } else if (in_port == 1 || in_port == 3 || in_port == 7 || in_port == 8) {
+    } else if (in_port == 1 || in_port == 3 || in_port == 7) {
         /**a packet has been pushed by the underlying network.**/
         /*check if it needs to be forwarded*/
         if (gc->use_mac) {
@@ -379,6 +379,81 @@ void Forwarder::push(int in_port, Packet *p) {
             }
         }
 
+        if ((out_links.size() == 0) && (!pushLocally)) {
+            p->kill();
+        }
+    }else if(in_port==8)
+    {
+        click_chatter("fw: receive a flooding request") ;
+        if (gc->use_mac) {
+            memcpy(FID._data, p->data() + 14, FID_LEN);
+        } else {
+            memcpy(FID._data, p->data() + 28, FID_LEN);
+        }
+        BABitvector testFID(FID);
+        BABitvector reverse_FID(FID_LEN*8) ;//our proposal the reverse FID, from sub to pub
+        EtherAddress reverse_dst ;//our proposal reverse link source
+        EtherAddress reverse_src ;//our proposal reverse link destination
+        uint32_t offset = 0 ;//our proposal the offset to reverse FID in the probing message
+
+        //get the reverse src and dst
+        offset = *(p->anno_u32()) ;
+        memcpy(reverse_src.data(), p->data(), MAC_LEN) ;
+        memcpy(reverse_dst.data(), p->data()+MAC_LEN, MAC_LEN) ;
+        memcpy(reverse_FID._data, p->data()+offset, FID_LEN) ;
+        testFID.negate();
+        if (!testFID.zero()) {
+            /*Check all entries in my forwarding table and forward appropriately*/
+            for (int i = 0; i < fwTable.size(); i++) {
+                if(((*fe->src) == reverse_src) && ((*fe->dst) == reverse_dst))
+                {
+                    reverse_FID |= (*fe->LID) ;
+                    continue ;
+                }
+                out_links.push_back(fe);
+            }
+        } else {
+            /*all bits were 1 - probably from a link_broadcast strategy--do not forward*/
+        }
+        /*check if the packet must be pushed locally*/
+        andVector = FID & gc->iLID;/*this is how to check wether the packet is destined to the local node*/
+        if (andVector == gc->iLID) {
+            pushLocally = true;
+        }
+        if ( (!testFID.zero()) && (!pushLocally) )
+        {
+            for (out_links_it = out_links.begin(); out_links_it != out_links.end(); out_links_it++)
+            {
+                if ((counter == out_links.size()) && (pushLocally == false)) {
+                    payload = p->uniqueify();
+                } else {
+                    payload = p->clone()->uniqueify();
+                }
+                fe = *out_links_it;
+                if (gc->use_mac) {
+                    /*prepare the mac header*/
+                    /*destination MAC*/
+                    memcpy(payload->data()+offset, reverse_FID._data, FID_LEN) ;
+                    memcpy(payload->data(), fe->dst->data(), MAC_LEN);
+                    /*source MAC*/
+                    memcpy(payload->data() + MAC_LEN, fe->src->data(), MAC_LEN);
+                    /*push the packet to the appropriate ToDevice Element*/
+                    output(fe->port).push(payload);
+                }
+                else
+                {
+                    click_chatter("only support mac") ;
+                }
+            }
+        }
+        if (pushLocally) {
+            if (gc->use_mac) {
+                p->pull(14);
+                payload = p->uniqueify();
+                memcpy(payload->data()+offset-14, reverse_FID._data, FID_LEN) ;
+                output(4).push(payload);
+            }
+        }
         if ((out_links.size() == 0) && (!pushLocally)) {
             p->kill();
         }

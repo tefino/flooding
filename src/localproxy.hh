@@ -335,6 +335,8 @@ public:
     void sendScopeProbingMessage(Vector<String> IDs, HashTable<String, BABitvector> FID_to_each_sub,\
                                  HashTable<String, unsigned int> each_sub_hopcount) ;
     void handleScopeProbingMessage(Vector<String> IDs, Packet* p) ;
+
+    void floodingReq(Vector<String> &SIDs, StringSet &IIDs, BABitvector iLIDs) ;
     /**@brief A pointer to the GlobalConf Element so that LocalProxy can access the node's Global Configuration.
      */
     GlobalConf *gc;

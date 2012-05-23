@@ -226,9 +226,9 @@ void Domain::writeClickFiles(bool montoolstub) {
         NetworkNode *nn = network_nodes[i];
         click_conf.open((write_conf + nn->label + ".conf").c_str());
         if (montoolstub && (nn->running_mode.compare("user") == 0)) {
-            click_conf << "require(blackadder_kanycast); \n\nControlSocket(\"TCP\",55555);\n\n " << endl << endl;
+            click_conf << "require(blackadder_flooding); \n\nControlSocket(\"TCP\",55555);\n\n " << endl << endl;
         } else {
-            click_conf << "require(blackadder_kanycast);" << endl << endl;
+            click_conf << "require(blackadder_flooding);" << endl << endl;
         }
         /*Blackadder Elements First*/
         click_conf << "globalconf::GlobalConf(MODE " << overlay_mode << ", NODEID " << nn->label << "," << endl;
@@ -474,7 +474,7 @@ void Domain::startTM() {
     }
     pclose(ssh_command);
     /*now start the TM*/
-    command = "ssh " + user + "@" + TM_node->testbed_ip + " \"/home/" + "/blackadder-2.1/TopologyManager/tm " + write_conf + "topology.graphml > /tmp/tm.log 2>&1 &\"";
+    command = "ssh " + user + "@" + TM_node->testbed_ip + " \"/home/" + "/flooding/TopologyManager/tm " + write_conf + "topology.graphml > /tmp/tm.log 2>&1 &\"";
     cout << command << endl;
     ssh_command = popen(command.c_str(), "r");
     if (ssh_command == NULL) {

@@ -420,7 +420,7 @@ public:
     void requestTMAssistanceForNotifyingSubscribers(unsigned char request_type, StringSet &IDs, RemoteHostSet &_subscribers, unsigned char strategy);
     /**@brief kanycast notify the subscriber about the information items under the scope he/she just subscribed
      */
-    void kanycast_askTMforNotifySub(unsigned char type, StringSet& IIDs, unsigned char strategy, RemoteHostSet& sub, StringSet& SIDs, unsigned int noofpub) ;
+    void kanycast_askTMforNotifySub(unsigned char type, StringSet& IIDs, unsigned char strategy, RemoteHostSet& pub, RemoteHostSet& sub, StringSet& SIDs, unsigned int noofpub) ;
     /**@brief kanycast tell pub to send probing_scope message
     */
     void kanycast_rendezvous(RemoteHostSet& pub, RemoteHostSet& sub, StringSet& SIDs, unsigned char stratefy) ;
@@ -429,7 +429,7 @@ public:
     void kanycast_askTMforRendezvous(RemoteHostSet& pub, RemoteHostSet& sub, StringSet& SIDs, unsigned char strategy) ;
     /**@brief kanycast notify subsribers all the info item under the subscribed scope
      */
-    void kanycast_notifySubscribers(unsigned char type, StringSet& IIDs, unsigned char strategy, RemoteHostSet& sub, StringSet& SIDs, unsigned int noofpub) ;
+    void kanycast_notifySubscribers(unsigned char type, StringSet& IIDs, unsigned char strategy, RemoteHostSet& pub, RemoteHostSet& sub, StringSet& SIDs, unsigned int noofpub) ;
     /**@brief A pointer to the GlobalConf Element so that LocalProxy can access the node's Global Configuration.
      */
      GlobalConf *gc;

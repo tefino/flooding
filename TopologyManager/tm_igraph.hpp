@@ -68,6 +68,7 @@ public:
                       map<string,map<string, Bitvector *> > &opresult);
     void calculateFID(set<string> &publishers, set<string> &subscribers,\
                       map<string, map<string,pair<Bitvector*, unsigned int> > > &kanycast_result) ;
+    void calculateFID(string &source, set<string> &dest, Bitvector &result, string &bestnode) ;
     /**@brief used internally by the above method.
      *
      * @param source

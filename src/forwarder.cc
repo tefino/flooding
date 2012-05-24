@@ -477,6 +477,22 @@ void Forwarder::push(int in_port, Packet *p) {
 
         //get the reverse src and dst
         offset = 14+FID_LEN+sizeof(unsigned char)+sizeof(numberOfIDs)+index+IBFSIZE+EBFSIZE ;
+        
+        
+        unsigned char noofnode ;
+        memcpy(&noofnode, p->data()+offset+FID_LEN, sizeof(noofnode)) ;
+        int avoidindex ;
+        for(avoidindex = 0 ; i < (int)noofnode ; avoidindex++)
+        {
+            String tempnodeid = String((const char*)(p->data()+offset+FID_LEN+sizeof(noofnode)+avoidindex*NODEID_LEN), NODEID_LEN) ;
+            if(tempnodeid == gc->nodeID)
+                return ;
+        }
+        noofnode++ ;
+        
+        
+        
+        
         memcpy(reverse_src.data(), p->data(), MAC_LEN) ;
         memcpy(reverse_dst.data(), p->data()+MAC_LEN, MAC_LEN) ;
         memcpy(reverse_FID._data, p->data()+offset, FID_LEN) ;
@@ -489,8 +505,13 @@ void Forwarder::push(int in_port, Packet *p) {
                 break ;
             }
         }
-        payload = p->uniqueify() ;
+        payload = p->put(NODEID_LEN) ;
         memcpy(payload->data()+offset, reverse_FID._data, FID_LEN) ;
+        
+        
+        memcpy(payload->data()+offset+FID_LEN, &noofnode, sizeof(noofnode)) ;
+        memcpy(p->data()+offset+FID_LEN+sizeof(noofnode)+avoidindex*NODEID_LEN, gc->nodeID.c_str, NODEID_LEN) ;
+        
         
         output(5).push(payload) ;
     }else if(in_port == 9)

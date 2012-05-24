@@ -413,9 +413,9 @@ void Domain::startClick() {
         NetworkNode *nn = network_nodes[i];
         /*kill click first both from kernel and user space*/
         if (sudo) {
-            command = "ssh " + user + "@" + nn->testbed_ip + " \"sudo pkill -9 click\"";
+            command = "ssh " + user + "@" + nn->testbed_ip + " \"sudo pkill click\"";
         } else {
-            command = "ssh " + user + "@" + nn->testbed_ip + " \"pkill -9 click\"";
+            command = "ssh " + user + "@" + nn->testbed_ip + " \"pkill click\"";
         }
         cout << command << endl;
         ssh_command = popen(command.c_str(), "r");

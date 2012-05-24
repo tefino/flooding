@@ -191,7 +191,7 @@ void Forwarder::push(int in_port, Packet *p) {
         }
         for (out_links_it = out_links.begin(); out_links_it != out_links.end(); out_links_it++) {
         	/*for data collection*/
-        	int temp_tt = total_throughput ;
+            int temp_tt = total_throughput ;
             total_throughput += p->length() ;
             if(total_throughput	< temp_tt)
             	GB_tt++ ;

@@ -137,6 +137,8 @@ int Forwarder::initialize(ErrorHandler *errh) {
     req_size = 0 ;
     data_size = 0 ;
     total_throughput = 0 ;
+    GB_ds = 0 ;
+    GB_tt = 0 ;
     return 0;
 }
 
@@ -149,10 +151,13 @@ void Forwarder::cleanup(CleanupStage stage) {
     }
     click_chatter("Forwarder: Cleaned Up!");
     /*for data collection*/
-    click_chatter("no_req: %d", no_req) ;
-    click_chatter("req_size: %d",req_size) ;
-    click_chatter("data_size: %d", data_size) ;
-    click_chatter("throughput: %d", total_throughput) ;
+    int fd ;
+    fd = open("/tmp/flooding.dat", O_RDWR|O_CREAT|O_TRUNC, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP) ;
+    char input[100] ;
+    sprintf(input, "no_req: %d\nreq_size: %d\nGB_ds: %d\ndata_size: %d\nGB_tt: %d\nthroughput: %d",\
+    no_req, req_size, GB_ds, data_size, GB_tt, total_throughput) ;
+    write(fd, input, strlen(input)) ;
+    close(fd) ;
 }
 
 void Forwarder::push(int in_port, Packet *p) {
@@ -186,7 +191,10 @@ void Forwarder::push(int in_port, Packet *p) {
         }
         for (out_links_it = out_links.begin(); out_links_it != out_links.end(); out_links_it++) {
         	/*for data collection*/
+        	int temp_tt = total_throughput ;
             total_throughput += p->length() ;
+            if(total_throughput	< temp_tt)
+            	GB_tt++ ;
             if (counter == out_links.size()) {
                 payload = p->uniqueify();
             } else {
@@ -230,7 +238,10 @@ void Forwarder::push(int in_port, Packet *p) {
                 {
                     click_chatter("fw: sending out data") ;
                     /*for data collection*/
+                    int temp_ds = data_size ;
                     data_size += p->length() ;
+                    if(data_size < temp_size)
+                    	GB_ds++ ;
                     memcpy(newPacket->data() + MAC_LEN + MAC_LEN, &datapush_type, 2) ;
                 }
                 else if(in_port == 6)
@@ -286,7 +297,10 @@ void Forwarder::push(int in_port, Packet *p) {
         	/*for data collection*/
             no_req++ ;
             req_size += p->length() ;
+            int temp_tt = total_throughput ;
             total_throughput += p->length() ;
+            if(total_throughput	< temp_tt)
+            	GB_tt++ ;
             if (counter == out_links.size()) {
                 payload = p->uniqueify();
             } else {
@@ -362,7 +376,10 @@ void Forwarder::push(int in_port, Packet *p) {
 
             for (out_links_it = out_links.begin(); out_links_it != out_links.end(); out_links_it++) {
             	/*for data collection*/
-                total_throughput += p->length() ;
+                int temp_tt = total_throughput ;
+           	total_throughput += p->length() ;
+            	if(total_throughput< temp_tt)
+            		GB_tt++ ;
                 if ((counter == out_links.size()) && (pushLocally == false)) {
                     payload = p->uniqueify();
                 } else {
@@ -513,7 +530,12 @@ void Forwarder::push(int in_port, Packet *p) {
             for (out_links_it = out_links.begin(); out_links_it != out_links.end(); out_links_it++)
             {
             	/*for data collection*/
-                total_throughput += p->length() ;
+            	no_req++ ;
+            	req_size += p->length() ;
+                int temp_tt = total_throughput ;
+            	total_throughput += p->length() ;
+            	if(total_throughput< temp_tt)
+            		GB_tt++ ;
                 if ((counter == out_links.size()) && (pushLocally == false)) {
                     payload = p->uniqueify();
                 } else {

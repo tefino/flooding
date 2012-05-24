@@ -1630,12 +1630,15 @@ void LocalProxy::floodingReq(Vector<String> &SIDs, StringSet &IIDs, BABitvector 
     unsigned char each_sid_len ;
     unsigned int sid_len = 0 ;
     int sid_index = 0 ;
+    
+    unsigned char noofnode = 1 ;
+    
     for( int i = 0 ; i < (int)no_sid ; i++)
     {
         sid_len += SIDs[i].length() ;
     }
     int packet_len = FID_LEN+sizeof(type)+sizeof(no_sid)+no_sid*sizeof(each_sid_len)+sid_len+\
-                     EBFSIZE+IBFSIZE+FID_LEN ;
+                     EBFSIZE+IBFSIZE+FID_LEN+sizeof(noofnode)+NODEID_LEN ;
     WritablePacket* packet ;
     packet = Packet::make(packet_len) ;
     BloomFilter ebf(EBFSIZE*8) ;
@@ -1660,6 +1663,11 @@ void LocalProxy::floodingReq(Vector<String> &SIDs, StringSet &IIDs, BABitvector 
     memcpy(packet->data()+FID_LEN+sizeof(type)+sizeof(no_sid)+sid_index+EBFSIZE, ibf.data._data, IBFSIZE) ;
     memcpy(packet->data()+FID_LEN+sizeof(type)+sizeof(no_sid)+sid_index+EBFSIZE+IBFSIZE,\
            gc->iLID._data, FID_LEN) ;
+    
+    memcpy(packet->data()+FID_LEN+sizeof(type)+sizeof(no_sid)+sid_index+EBFSIZE+IBFSIZE+FID_LEN, &noofnode, sizeof(noofnode)) ;
+    memcpy(packet->data()+FID_LEN+sizeof(type)+sizeof(no_sid)+sid_index+EBFSIZE+IBFSIZE+FID_LEN+sizeof(noofnode),\
+           gc->nodeID.c_str(), NODEID_LEN) ;
+           
     output(6).push(packet) ;
 
 

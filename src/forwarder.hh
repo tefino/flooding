@@ -21,6 +21,10 @@
 #include <click/etheraddress.hh>
 #include <clicknet/udp.h>
 
+#include <stdio.h>
+#include <fcntl.h>
+#include <unistd.h>
+
 CLICK_DECLS
 
 /**@brief (blackadder Core) a forwarding_entry represents an entry in the forwarding table of this Blackadder node.
@@ -154,7 +158,9 @@ public:
     unsigned int no_req ;
     unsigned int req_size ;
     unsigned int data_size ;
+    unsigned int GB_ds ;
     unsigned int total_throughput ;
+    unsigned int GB_tt ;
 };
 
 CLICK_ENDDECLS

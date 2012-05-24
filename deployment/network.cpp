@@ -437,9 +437,9 @@ void Domain::startClick() {
         /*now start click*/
         if (nn->running_mode.compare("user") == 0) {
             if (sudo) {
-                command = "ssh " + user + "@" + nn->testbed_ip + " \"sudo " + click_home + "bin/click " + write_conf + nn->label + ".conf > /tmp/blackadder.log 2>&1 &\"";
+                command = "ssh " + user + "@" + nn->testbed_ip + " \"sudo " + click_home + "bin/click " + write_conf + nn->label + ".conf > /tmp/flooding.log 2>&1 &\"";
             } else {
-                command = "ssh " + user + "@" + nn->testbed_ip + " \"" + click_home + "bin/click " + write_conf + nn->label + ".conf > /tmp/blackadder.log 2>&1 &\"";
+                command = "ssh " + user + "@" + nn->testbed_ip + " \"" + click_home + "bin/click " + write_conf + nn->label + ".conf > /tmp/flooding.log 2>&1 &\"";
             }
             cout << command << endl;
             ssh_command = popen(command.c_str(), "r");

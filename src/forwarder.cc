@@ -486,7 +486,11 @@ void Forwarder::push(int in_port, Packet *p) {
         {
             String tempnodeid = String((const char*)(p->data()+offset+FID_LEN+sizeof(noofnode)+avoidindex*NODEID_LEN), NODEID_LEN) ;
             if(tempnodeid == gc->nodeID)
-                return ;
+            {
+            	p->kill() ;
+            	return ;
+            }
+                
         }
         noofnode++ ;
         

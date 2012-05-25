@@ -514,7 +514,7 @@ void Forwarder::push(int in_port, Packet *p) {
         
         
         memcpy(payload->data()+offset+FID_LEN, &noofnode, sizeof(noofnode)) ;
-        memcpy(p->data()+offset+FID_LEN+sizeof(noofnode)+avoidindex*NODEID_LEN, gc->nodeID.c_str, NODEID_LEN) ;
+        memcpy(payload->data()+offset+FID_LEN+sizeof(noofnode)+avoidindex*NODEID_LEN, gc->nodeID.c_str(), NODEID_LEN) ;
         
         
         output(5).push(payload) ;

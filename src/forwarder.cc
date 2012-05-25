@@ -482,7 +482,7 @@ void Forwarder::push(int in_port, Packet *p) {
         unsigned char noofnode ;
         memcpy(&noofnode, p->data()+offset+FID_LEN, sizeof(noofnode)) ;
         int avoidindex ;
-        for(avoidindex = 0 ; i < (int)noofnode ; avoidindex++)
+        for(avoidindex = 0 ; avoidindex < (int)noofnode ; avoidindex++)
         {
             String tempnodeid = String((const char*)(p->data()+offset+FID_LEN+sizeof(noofnode)+avoidindex*NODEID_LEN), NODEID_LEN) ;
             if(tempnodeid == gc->nodeID)

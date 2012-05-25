@@ -240,7 +240,7 @@ void Forwarder::push(int in_port, Packet *p) {
                     /*for data collection*/
                     int temp_ds = data_size ;
                     data_size += p->length() ;
-                    if(data_size < temp_size)
+                    if(data_size < temp_ds)
                     	GB_ds++ ;
                     memcpy(newPacket->data() + MAC_LEN + MAC_LEN, &datapush_type, 2) ;
                 }

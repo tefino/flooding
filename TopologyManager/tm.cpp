@@ -223,7 +223,7 @@ void handleRequest(char *request, int request_len) {
             free(response);
         }
     }else if((request_type == INFO_PUBLISHED))
-    {
+    {//for flooding
         Bitvector iLIDs(FID_LEN*8) ;
         memcpy(&no_publishers, request + sizeof (request_type) + sizeof (strategy), sizeof (no_publishers));
         for (int i = 0; i < (int) no_publishers; i++) {
@@ -243,7 +243,7 @@ void handleRequest(char *request, int request_len) {
             subscribers.insert(nodeID);
         }
         for (set<string>::iterator iter = subscribers.begin() ; iter != subscribers.end() ; iter++)
-        {
+        {//notify every subscriber
             string subnodeid = *iter ;
             Bitvector *FID_to_subscriber = tm_igraph.calculateFID(tm_igraph.nodeID, subnodeid);
 

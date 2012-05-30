@@ -282,15 +282,12 @@ void Forwarder::push(int in_port, Packet *p) {
             counter++;
         }
     }else if( in_port == 6)
-    {
+    {//flooding push the packet out from every output port
         for (int i = 0; i < fwTable.size(); i++) {
             fe = fwTable[i];
-            out_links.push_back(fe);
+            out_links.push_back(fe);//get all the output port
         }
         if (out_links.size() == 0) {
-            /*I can get here when an app or a click element did publish_data with a specific FID
-             *Note that I never check if I can push back the packet above if it matches my iLID
-             * the upper elements should check before pushing*/
             p->kill();
         }
         for (out_links_it = out_links.begin(); out_links_it != out_links.end(); out_links_it++) {
@@ -457,7 +454,8 @@ void Forwarder::push(int in_port, Packet *p) {
             p->kill();
         }
     }else if(in_port==8)
-    {
+    {//this is a flooding request
+    //add the reverse LID, and check there is loop
         unsigned char numberOfIDs ;
         unsigned char IDLength /*in fragments of PURSUIT_ID_LEN each*/;
         int index = 0 ;
@@ -483,10 +481,10 @@ void Forwarder::push(int in_port, Packet *p) {
         memcpy(&noofnode, p->data()+offset+FID_LEN, sizeof(noofnode)) ;
         int avoidindex ;
         for(avoidindex = 0 ; avoidindex < (int)noofnode ; avoidindex++)
-        {
+        {//check all the node that this request has been passed
             String tempnodeid = String((const char*)(p->data()+offset+FID_LEN+sizeof(noofnode)+avoidindex*NODEID_LEN), NODEID_LEN) ;
             if(tempnodeid == gc->nodeID)
-            {
+            {//loop found
             	p->kill() ;
             	return ;
             }
@@ -504,7 +502,7 @@ void Forwarder::push(int in_port, Packet *p) {
         {
             fe = fwTable[i];
             if(((*fe->src) == reverse_src) && ((*fe->dst) == reverse_dst))
-            {
+            {//add the reverse LID
                 reverse_FID |= (*fe->LID) ;
                 break ;
             }
@@ -515,7 +513,7 @@ void Forwarder::push(int in_port, Packet *p) {
         
         memcpy(payload->data()+offset+FID_LEN, &noofnode, sizeof(noofnode)) ;
         memcpy(payload->data()+offset+FID_LEN+sizeof(noofnode)+avoidindex*NODEID_LEN, gc->nodeID.c_str(), NODEID_LEN) ;
-        
+        //add this node ID to this reqeust
         
         output(5).push(payload) ;
     }else if(in_port == 9)
@@ -537,7 +535,7 @@ void Forwarder::push(int in_port, Packet *p) {
             for (int i = 0; i < fwTable.size(); i++) {
                 fe = fwTable[i];
                 if(((*fe->src) == reverse_src) && ((*fe->dst) == reverse_dst))
-                {
+                {//forward this request to every output port except the one the request arrives
                     continue ;
                 }
                 out_links.push_back(fe);

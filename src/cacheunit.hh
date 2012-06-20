@@ -19,6 +19,7 @@ public:
     CacheEntry(Vector<String> newSID, String IID, char* data, int datalen)
     {
         SIDs = newSID ;
+        IIDs.push_back(IID) ;
         _data[IID] = (char*)malloc(datalen) ;
         _data_length[IID] = datalen ;
         memcpy(_data[IID], data, datalen) ;
